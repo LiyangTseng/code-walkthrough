@@ -1,0 +1,10 @@
+{
+  "name": "code-walkthrough",
+  "version": "0.1.0",
+  "description": "Interactive walkthrough pages that follow one request through real code pinned at a commit, to understand an issue before implementing it.",
+  "author": { "name": "LiyangTseng" },
+  "repository": "https://github.com/LiyangTseng/code-walkthrough",
+  "license": "MIT",
+  "keywords": ["onboarding", "code-reading", "walkthrough", "issues", "skills"],
+  "skills": ["./skills/code-walkthrough"]
+}

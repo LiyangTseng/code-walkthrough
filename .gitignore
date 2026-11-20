@@ -1,0 +1,3 @@
+# built pages: rebuild with scripts/build.mjs
+examples/**/*.html
+.DS_Store

@@ -1,0 +1,15 @@
+{
+  "name": "code-walkthrough",
+  "owner": { "name": "LiyangTseng" },
+  "metadata": { "description": "Code-trace walkthrough skill", "version": "0.1.0" },
+  "plugins": [
+    {
+      "name": "code-walkthrough",
+      "source": "./",
+      "description": "Interactive walkthrough pages that follow one request through real code pinned at a commit, to understand an issue before implementing it.",
+      "version": "0.1.0",
+      "author": { "name": "LiyangTseng" },
+      "category": "development"
+    }
+  ]
+}

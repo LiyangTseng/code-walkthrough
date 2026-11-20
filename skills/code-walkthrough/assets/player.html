@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="@@LANG@@">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>@@TITLE@@</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* code-walkthrough player. Layout: pinned source on the left, animated map + narration on the right; one column below 1000px.
+   Page-specific content comes from the WALK object (walk.js) and the map SVG; this file is shared by every walkthrough. */
+:root {
+  --bg: #f1f3f5; --panel: #ffffff; --ink: #19212b; --muted: #5b6574; --line: #d6dce3;
+  --accent: #0b7682; --accent-soft: rgba(11,118,130,.10);
+  --warm: #b8730a; --warm-soft: rgba(184,115,10,.14);
+  --cool: #4a43d8; --cool-soft: rgba(74,67,216,.12);
+  --good: #2e7d4f; --good-soft: rgba(46,125,79,.13);
+  --bad: #b23a1e; --bad-soft: rgba(178,58,30,.10);
+  --code-bg: #f8f9fb; --hl: rgba(11,118,130,.13);
+  --k: #9b1f6e; --s: #2c7a34; --c: #7b8593; --n: #a85a06; --t: #1f63b8; --m: #0b7682; --lt: #8a5a00;
+  --font-body: "IBM Plex Sans", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-head: "IBM Plex Sans", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e131a; --panel: #151c25; --ink: #e5eaf1; --muted: #9ba7b6; --line: #29333f;
+  --accent: #3cc4cd; --accent-soft: rgba(60,196,205,.12);
+  --warm: #f0aa3c; --warm-soft: rgba(240,170,60,.16);
+  --cool: #9091fa; --cool-soft: rgba(144,145,250,.16);
+  --good: #6cc28f; --good-soft: rgba(108,194,143,.16);
+  --bad: #ef8a6a; --bad-soft: rgba(239,138,106,.14);
+  --code-bg: #111821; --hl: rgba(60,196,205,.15);
+  --k: #f07ab8; --s: #8fd18e; --c: #7d8896; --n: #f4b46a; --t: #7fb4ff; --m: #3cc4cd; --lt: #e6b45c;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e131a; --panel: #151c25; --ink: #e5eaf1; --muted: #9ba7b6; --line: #29333f;
+  --accent: #3cc4cd; --accent-soft: rgba(60,196,205,.12);
+  --warm: #f0aa3c; --warm-soft: rgba(240,170,60,.16);
+  --cool: #9091fa; --cool-soft: rgba(144,145,250,.16);
+  --good: #6cc28f; --good-soft: rgba(108,194,143,.16);
+  --bad: #ef8a6a; --bad-soft: rgba(239,138,106,.14);
+  --code-bg: #111821; --hl: rgba(60,196,205,.15);
+  --k: #f07ab8; --s: #8fd18e; --c: #7d8896; --n: #f4b46a; --t: #7fb4ff; --m: #3cc4cd; --lt: #e6b45c;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 30px; }
+a { color: var(--accent); }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+h1, h2, h3 { font-family: var(--font-head); text-wrap: balance; margin: 0; line-height: 1.3; }
+[hidden] { display: none !important; }
+
+header.top { display: grid; gap: 10px; max-width: 920px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 700; }
+.thesis { font-size: clamp(17px, 2.1vw, 21px); font-weight: 500; line-height: 1.55; margin: 4px 0 0; padding-left: 14px; border-left: 3px solid var(--warm); }
+.thesis b { color: var(--warm); font-weight: 700; }
+.links { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--muted); }
+.fail { border: 1px solid var(--bad); background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 10px 14px; font-family: var(--font-mono); font-size: 13px; white-space: pre-wrap; }
+
+.tracks { display: flex; flex-wrap: wrap; gap: 8px; }
+.tracks button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+.tracks button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.player { display: grid; gap: 18px; grid-template-columns: 1fr; grid-template-areas: "side" "code"; }
+@media (min-width: 1000px) { .player { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); grid-template-areas: "code side"; align-items: start; } }
+.side { grid-area: side; display: grid; gap: 18px; min-width: 0; align-content: start; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+
+.code { grid-area: code; display: flex; flex-direction: column; overflow: hidden; }
+@media (min-width: 1000px) { .code { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); } }
+.code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.code-file { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.code-file b { color: var(--ink); font-weight: 600; }
+.code-head a { font-size: 12.5px; white-space: nowrap; }
+.code-body { position: relative; overflow: auto; background: var(--code-bg); font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; max-height: 520px; padding: 8px 0; }
+@media (min-width: 1000px) { .code-body { max-height: none; flex: 1; } }
+.ln { display: grid; grid-template-columns: 50px auto; white-space: pre; border-left: 3px solid transparent; transition: background .25s; }
+.ln .no { color: var(--c); text-align: right; padding-right: 12px; user-select: none; opacity: .75; }
+.ln .tx { padding-right: 16px; }
+.ln.on { background: var(--hl); border-left-color: var(--accent); }
+.ln.on .no { color: var(--accent); opacity: 1; font-weight: 600; }
+.code-body.has-on .ln:not(.on) .tx { opacity: .55; }
+.k { color: var(--k); } .s { color: var(--s); } .c { color: var(--c); font-style: italic; } .n { color: var(--n); } .t { color: var(--t); } .m { color: var(--m); } .lt { color: var(--lt); }
+
+.stage { padding: 12px; display: grid; gap: 10px; }
+.stage-scroll { overflow-x: auto; }
+.stage-scroll > svg { display: block; width: 100%; min-width: 600px; height: auto; font-family: var(--font-body); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); padding: 0 4px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.meters { display: flex; flex-wrap: wrap; gap: 8px; }
+.meters:empty { display: none; }
+.meter { border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; display: grid; min-width: 0; }
+.meter .mk { font-size: 11.5px; color: var(--muted); }
+.meter .mv { font-family: var(--font-mono); font-weight: 600; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.meter.bad { border-color: var(--bad); background: var(--bad-soft); } .meter.bad .mv { color: var(--bad); }
+.meter.good { border-color: var(--good); background: var(--good-soft); } .meter.good .mv { color: var(--good); }
+.meter.key { border-color: var(--accent); background: var(--accent-soft); } .meter.key .mv { color: var(--accent); }
+
+/* Map vocabulary: author SVGs use these classes; ids on .box / .layer are what scenes focus or warn. */
+svg .box { fill: none; stroke: var(--line); stroke-width: 1.2; transition: stroke .3s, fill .3s; }
+svg .layer rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; transition: stroke .3s, fill .3s; }
+svg .layer text { fill: var(--ink); font-size: 12px; text-anchor: middle; }
+svg .box.focus, svg .layer.focus rect { stroke: var(--accent); stroke-width: 2; fill: var(--accent-soft); }
+svg .box.warn, svg .layer.warn rect { stroke: var(--bad); stroke-width: 2; fill: var(--bad-soft); }
+svg .lbl { fill: var(--muted); font-size: 11.5px; }
+svg .lbl-strong { fill: var(--ink); font-size: 12.5px; font-weight: 600; }
+svg .arrow { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+svg .lane { stroke: var(--muted); stroke-width: 1.2; fill: none; stroke-dasharray: 3 3; }
+svg .note { fill: var(--ink); font-size: 12.5px; font-weight: 500; }
+svg .actor { transition: transform .6s cubic-bezier(.4,.1,.2,1), opacity .35s; }
+svg .actor.glow > :not(text) { stroke: var(--ink); stroke-width: 2; }
+svg .actor text { font-size: 12px; font-weight: 600; text-anchor: middle; dominant-baseline: central; fill: var(--bg); }
+svg .actor.chip text { font-size: 9.5px; }
+.tone-ink { fill: var(--ink); } .tone-muted { fill: var(--muted); } .tone-accent { fill: var(--accent); }
+.tone-warm { fill: var(--warm); } .tone-cool { fill: var(--cool); } .tone-good { fill: var(--good); } .tone-bad { fill: var(--bad); }
+
+.narr { padding: 18px 20px 20px; display: grid; gap: 12px; }
+.narr-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.stepno { font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+.narr h2 { font-size: 21px; font-weight: 700; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: 12px; padding: 1px 9px; border-radius: 999px; border: 1px solid currentColor; }
+.tag.fact { color: var(--accent); } .tag.infer { color: var(--warm); } .tag.measure { color: var(--cool); } .tag.draft, .tag.schematic { color: var(--muted); }
+.narr-body { max-width: 70ch; }
+.narr-body p { margin: 0 0 10px; }
+.narr-body p:last-child { margin-bottom: 0; }
+.narr-body ul, .narr-body ol { margin: 0 0 10px; padding-left: 20px; }
+.narr-body pre { font-family: var(--font-mono); font-size: 12.5px; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; margin: 0 0 10px; line-height: 1.55; }
+.concept { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 14px; background: var(--bg); font-size: 14px; }
+.concept .ct { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .05em; display: block; margin-bottom: 2px; }
+.calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 10px; }
+.calc label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.calc input { font: inherit; font-family: var(--font-mono); padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); width: 100%; }
+.calc-out { font-size: 15.5px; font-weight: 500; padding: 10px 12px; border-radius: 8px; background: var(--warm-soft); }
+.calc-out b { font-family: var(--font-mono); color: var(--warm); font-size: 17px; }
+
+.ctrl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; }
+.ctrl button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+.ctrl button.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.ctrl button:disabled { opacity: .4; cursor: default; }
+.dots { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; min-width: 120px; }
+.dots button { width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 10.5px; font-family: var(--font-mono); color: var(--muted); }
+.dots button[aria-current="true"] { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+.hint { font-size: 12px; color: var(--muted); }
+
+section.ref { display: grid; gap: 14px; }
+section.ref > h2 { font-size: 22px; }
+section.ref > p { margin: 0; max-width: 76ch; color: var(--muted); }
+.tbl-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 700; font-size: 13px; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td .g, .g { color: var(--good); font-weight: 600; } td .b, .b { color: var(--bad); font-weight: 600; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+.card { padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.card h3 { font-size: 15px; font-weight: 700; }
+.card.mono h3 { font-family: var(--font-mono); font-weight: 600; }
+.card p { margin: 0; font-size: 14px; }
+.card ul { margin: 0; padding-left: 18px; font-size: 14px; }
+.card .goto { font: inherit; font-size: 12.5px; justify-self: start; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; }
+ol.road { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: r; max-width: 920px; }
+ol.road li { counter-increment: r; display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: baseline; padding: 10px 14px; }
+ol.road li::before { content: counter(r); font-family: var(--font-mono); font-weight: 600; color: var(--muted); }
+ol.road li.done::before, ol.road li.done .st { color: var(--accent); }
+ol.road .st { font-size: 12px; color: var(--muted); white-space: nowrap; }
+ol.road li.next .st { color: var(--warm); font-weight: 700; }
+.foot { font-size: 13px; color: var(--muted); max-width: 920px; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { svg .actor, .ln, svg .box, svg .layer rect { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow" id="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="thesis" id="thesis"></p>
+    <div class="links" id="links"></div>
+  </header>
+  <div class="fail" id="fail" hidden></div>
+
+  <div class="tracks" role="tablist" id="tracks"></div>
+
+  <div class="player">
+    <div class="panel code">
+      <div class="code-head">
+        <div class="code-file" id="code-file"></div>
+        <a id="code-gh" target="_blank" rel="noopener"></a>
+      </div>
+      <div class="code-body" id="code-body"></div>
+    </div>
+    <div class="side">
+      <div class="panel stage">
+        <div class="stage-scroll" id="stage">
+@@MAP@@
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="meters" id="meters" aria-live="polite"></div>
+      </div>
+      <div class="panel narr" aria-live="polite">
+        <div class="narr-head"><span class="stepno" id="stepno"></span><h2 id="ntitle"></h2></div>
+        <div class="tags" id="ntags"></div>
+        <div class="narr-body" id="nbody"></div>
+        <div class="concept" id="nconcept"></div>
+        <div class="ctrl">
+          <button id="prev" type="button"></button>
+          <button id="next" type="button" class="primary"></button>
+          <button id="replay" type="button"></button>
+          <div class="dots" id="dots"></div>
+          <span class="hint" id="keyhint"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="after" class="wrap" style="gap:30px"></div>
+</div>
+
+<script>
+@@WALK@@
+</script>
+<script>
+(function () {
+"use strict";
+const W = WALK;
+const UI_PRESETS = {
+  en: { prev: "← Back", next: "Next →", nextTrack: n => `Next: ${n} →`, replay: "Replay", keys: "Keys: ← →",
+        openAt: r => `Open on GitHub ${r}`, open: "Open on GitHub", watch: (t, s) => `Watch ${t}.${s}`, stepLabel: (n, t) => `Step ${n}: ${t}`,
+        concepts: "Concepts", roadmap: "Road to done", unpinned: "unpinned", sep: ": ",
+        status: { done: "Done", next: "Next", todo: "To do" },
+        tags: { fact: "Verified", infer: "Inference", measure: "To measure", draft: "Draft, not decided", schematic: "Schematic" } },
+  "zh-TW": { prev: "← 上一步", next: "下一步 →", nextTrack: n => `下一段：${n} →`, replay: "重播動畫", keys: "鍵盤：← →",
+        openAt: r => `在 GitHub 開啟 ${r}`, open: "在 GitHub 開啟", watch: (t, s) => `看動畫 ${t}.${s}`, stepLabel: (n, t) => `第 ${n} 步：${t}`,
+        concepts: "觀念速查", roadmap: "完成這項工作的路線", unpinned: "未釘選版本", sep: "：",
+        status: { done: "完成", next: "下一步", todo: "待做" },
+        tags: { fact: "已查證", infer: "推論", measure: "待量測", draft: "設計草稿，尚未決定", schematic: "示意圖" } },
+};
+const UI = Object.assign({}, UI_PRESETS[W.ui] || UI_PRESETS.en, W.uiOverrides || {});
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function fail(msg) { const f = $("fail"); f.hidden = false; f.textContent += msg + "\n"; }
+
+// ---------- syntax highlight (lightweight, line-based) ----------
+const KW = {
+  rust: "fn let mut move async await pub use mod const struct enum trait impl match if else return for in as type Some None Ok Err true false self Self super crate where dyn ref loop while break continue unsafe static",
+  python: "def class return if elif else for while in not and or is None True False import from as with try except finally raise yield lambda async await pass break continue global nonlocal assert del self",
+  js: "function const let var return if else for while in of new class extends import from export default async await try catch finally throw typeof instanceof null undefined true false this switch case break continue yield interface type enum implements",
+  go: "func var const type struct interface map chan go defer return if else for range switch case default break continue package import nil true false select fallthrough",
+  c: "int char float double void long short unsigned signed const static struct union enum typedef return if else for while do switch case default break continue sizeof auto template typename class public private protected namespace using new delete virtual override nullptr true false constexpr inline __global__ __device__ __host__ __shared__ extern volatile",
+  java: "class interface enum extends implements public private protected static final void return if else for while do switch case default break continue new try catch finally throw throws import package null true false this super",
+};
+KW.ts = KW.js; KW.cpp = KW.c; KW.cuda = KW.c; KW.kotlin = KW.java;
+const LANG_EXT = { rs: "rust", py: "python", js: "js", mjs: "js", ts: "ts", tsx: "ts", jsx: "js", go: "go", c: "c", h: "c", cc: "cpp", cpp: "cpp", hpp: "cpp", cu: "cuda", cuh: "cuda", java: "java", kt: "kotlin" };
+const KWSET = {}; for (const k in KW) KWSET[k] = new Set(KW[k].split(" "));
+function hl(line, lang) {
+  const hash = lang === "python";
+  const re = hash
+    ? /(#.*$)|([rbfu]{0,2}"(?:\\.|[^"\\])*"|[rbfu]{0,2}'(?:\\.|[^'\\])*')|(@[A-Za-z_][\w.]*)|(\b\d[\d_.]*\b)|(\b[A-Za-z_]\w*\b)/g
+    : lang === "rust"
+    ? /(\/\/.*$)|(b?r#".*?"#|b?"(?:\\.|[^"\\])*")|('(?:\\.|[^'\\])'|'[a-z_]\w*)|(\b\d[\d_.xXa-fA-F]*\b)|(\b[a-z_]\w*!)|(\b[A-Za-z_]\w*\b)/g
+    : /(\/\/.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\0)|(\b\d[\d_.xXa-fA-F]*\b)|(\0)|(\b[A-Za-z_]\w*\b)/g;
+  const kws = KWSET[lang] || new Set();
+  let out = "", last = 0, m;
+  while ((m = re.exec(line))) {
+    out += esc(line.slice(last, m.index));
+    const t = m[0]; let cls = null;
+    if (hash) {
+      if (m[1]) cls = "c"; else if (m[2]) cls = "s"; else if (m[3]) cls = "m"; else if (m[4]) cls = "n";
+      else if (m[5]) { if (kws.has(t)) cls = "k"; else if (/^[A-Z]/.test(t)) cls = "t"; }
+    } else {
+      if (m[1]) cls = "c"; else if (m[2]) cls = "s"; else if (m[3]) cls = t.length > 3 && !t.endsWith("'") ? "lt" : "s";
+      else if (m[4]) cls = "n"; else if (m[5]) cls = "m";
+      else if (m[6]) { if (kws.has(t)) cls = "k"; else if (/^[A-Z]/.test(t)) cls = "t"; }
+    }
+    out += cls ? `<span class="${cls}">${esc(t)}</span>` : esc(t);
+    last = re.lastIndex;
+  }
+  return out + esc(line.slice(last));
+}
+
+// ---------- code panel ----------
+const SRC = W.sources;
+function blobUrl(key, a, b) {
+  const src = SRC[key];
+  if (W.blobUrl) return W.blobUrl(src.path, a, b);
+  if (!W.repoUrl || src.unpinned) return null;
+  return `${W.repoUrl}/blob/${W.sha}/${src.path}#L${a}` + (b && b !== a ? `-L${b}` : "");
+}
+let currentFile = null;
+function renderCode(key) {
+  if (currentFile === key) return;
+  currentFile = key;
+  const src = SRC[key];
+  const lang = src.lang || LANG_EXT[(src.path.split(".").pop() || "").toLowerCase()] || "";
+  $("code-body").innerHTML = src.text.split("\n").map((ln, i) =>
+    `<div class="ln" data-n="${src.start + i}"><span class="no">${src.start + i}</span><span class="tx">${hl(ln, lang) || " "}</span></div>`).join("");
+  $("code-file").innerHTML = esc(src.path).replace(/([^/]+)$/, "<b>$1</b>") + (src.unpinned ? ` · ${UI.unpinned}` : "");
+}
+function showCode(code) {
+  const body = $("code-body");
+  renderCode(code.f);
+  let first = null;
+  body.querySelectorAll(".ln").forEach(el => {
+    const n = +el.dataset.n;
+    const on = code.r.some(([a, b]) => n >= a && n <= b);
+    el.classList.toggle("on", on);
+    if (on && !first) first = el;
+  });
+  body.classList.toggle("has-on", !!first);
+  if (first) body.scrollTo({ top: Math.max(0, first.offsetTop - body.clientHeight * 0.22), behavior: "smooth" });
+  const a = code.r[0][0], b = code.r[code.r.length - 1][1];
+  const gh = $("code-gh"), url = blobUrl(code.f, a, b);
+  gh.hidden = !url;
+  if (url) { gh.href = url; gh.textContent = UI.openAt(a === b ? `L${a}` : `L${a}-${b}`); }
+}
+
+// ---------- map ----------
+const NS = "http://www.w3.org/2000/svg";
+const svg = $("stage").querySelector("svg");
+const MAP = W.map || {};
+const ZONES = MAP.zones || {};
+const ACTORS = MAP.actors || [];
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+const dyn = el("g", { id: "dyn" }, svg);
+const noteEl = MAP.note ? el("text", { class: "note", x: MAP.note[0], y: MAP.note[1] }, svg) : null;
+const actorEls = {};
+ACTORS.forEach(a => {
+  const tone = "tone-" + (a.tone || "ink");
+  const n = a.count || 1;
+  const g = el("g", { class: "actor " + (a.kind || "token") }, dyn);
+  for (let j = 0; j < n; j++) {
+    if ((a.kind || "token") === "token") el("circle", { cx: j * 26, cy: 0, r: 12, class: tone }, g);
+    else if (a.kind === "diamond") el("path", { d: `M${j * 20},-8 l8,8 l-8,8 l-8,-8Z`, class: tone }, g);
+    else el("rect", { x: j * 20 - 8, y: -8, width: 16, height: 16, rx: 2, class: tone }, g);
+  }
+  if (a.label) el("text", { x: 0, y: 0 }, g).textContent = a.label;
+  g.style.opacity = 0;
+  actorEls[a.id] = g;
+});
+function blank() { const at = {}; ACTORS.forEach(a => at[a.id] = "hidden"); return { at, focus: [], warn: [], glow: [], note: "", meters: [], custom: {} }; }
+function merge(s, p) {
+  const o = { at: Object.assign({}, s.at), focus: s.focus, warn: s.warn, glow: s.glow, note: s.note, meters: s.meters, custom: Object.assign({}, s.custom) };
+  for (const k in p) {
+    if (k === "at" || k === "custom") Object.assign(o[k], p[k]);
+    else o[k] = p[k];
+  }
+  return o;
+}
+function resolve(st) {
+  // zone name, [x, y], "@actor" (ride along with another actor) or "hidden"
+  const pos = {}, groups = {};
+  ACTORS.forEach(a => {
+    const z = st.at[a.id];
+    if (Array.isArray(z)) pos[a.id] = z.slice();
+    else if (z && ZONES[z]) { (groups[z] = groups[z] || []).push(a.id); }
+  });
+  for (const z in groups) {
+    const ids = groups[z], [x, y] = ZONES[z];
+    const tokens = ids.filter(id => (ACTORS.find(a => a.id === id).kind || "token") === "token");
+    ids.forEach(id => { pos[id] = [x, y]; });
+    tokens.forEach((id, i) => { pos[id] = [x + (i - (tokens.length - 1) / 2) * 26, y]; });
+  }
+  ACTORS.forEach(a => {
+    const z = st.at[a.id];
+    if (typeof z === "string" && z[0] === "@" && pos[z.slice(1)]) { const [x, y] = pos[z.slice(1)]; pos[a.id] = [x + 14, y - 14]; }
+  });
+  return pos;
+}
+const lastPos = {};
+function renderMap(st) {
+  const pos = resolve(st);
+  ACTORS.forEach(a => {
+    const g = actorEls[a.id], xy = pos[a.id];
+    if (xy) { lastPos[a.id] = xy; g.style.transform = `translate(${xy[0]}px, ${xy[1]}px)`; }
+    else if (lastPos[a.id]) g.style.transform = `translate(${lastPos[a.id][0]}px, ${lastPos[a.id][1]}px)`;
+    g.style.opacity = xy ? 1 : 0;
+    g.classList.toggle("glow", st.glow.includes(a.id));
+  });
+  svg.querySelectorAll(".focus, .warn").forEach(e => e.classList.remove("focus", "warn"));
+  st.focus.forEach(id => { const e = svg.querySelector("#" + CSS.escape(id)); if (e) e.classList.add("focus"); });
+  st.warn.forEach(id => { const e = svg.querySelector("#" + CSS.escape(id)); if (e) e.classList.add("warn"); });
+  if (noteEl) noteEl.textContent = st.note || "";
+  $("meters").innerHTML = (st.meters || []).map(m => `<div class="meter ${m.tone || ""}"><span class="mk">${esc(m.k)}</span><span class="mv">${esc(m.v)}</span></div>`).join("");
+  if (MAP.onFrame) MAP.onFrame(st, svg, { el, NS });
+}
+(function legend() {
+  const L = $("legend");
+  (MAP.legend || []).forEach(item => {
+    const s = document.createElement("span");
+    const tone = "tone-" + (item.tone || "ink");
+    let mark;
+    switch (item.mark) {
+      case "chip": mark = `<rect x="2" y="2" width="12" height="12" rx="2" class="${tone}"/>`; break;
+      case "diamond": mark = `<path d="M8,1 L15,8 L8,15 L1,8Z" class="${tone}"/>`; break;
+      case "outline": mark = `<rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="var(--${item.tone || "bad"})" stroke-width="2"/>`; break;
+      case "dash": mark = `<rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="var(--${item.tone || "cool"})" stroke-width="1.5" stroke-dasharray="3 2"/>`; break;
+      case "line": mark = `<path d="M1 8 H15" stroke="var(--${item.tone || "muted"})" stroke-width="1.5" stroke-dasharray="3 3"/>`; break;
+      default: mark = `<circle cx="8" cy="8" r="7" class="${tone}"/>`;
+    }
+    s.innerHTML = `<svg width="16" height="16" aria-hidden="true">${mark}</svg>${item.text}`;
+    L.appendChild(s);
+  });
+})();
+
+// ---------- player ----------
+const TRACKS = W.tracks;
+let ti = 0, si = 0, timers = [];
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const finals = new Map();
+function sceneStates(t, s) {
+  const sc = TRACKS[t].scenes[s];
+  let st = blank();
+  if (sc.carry) { const prev = s > 0 ? [t, s - 1] : t > 0 ? [t - 1, TRACKS[t - 1].scenes.length - 1] : null; if (prev) { const ps = sceneStates(prev[0], prev[1]); st = ps[ps.length - 1]; } }
+  const states = [];
+  (sc.frames && sc.frames.length ? sc.frames : [{}]).forEach(f => { st = merge(st, f); states.push(st); });
+  return states;
+}
+function play() {
+  timers.forEach(clearTimeout); timers = [];
+  const states = sceneStates(ti, si);
+  if (reduce) { renderMap(states[states.length - 1]); return; }
+  states.forEach((s, k) => timers.push(setTimeout(() => renderMap(s), k * (MAP.frameMs || 850))));
+}
+function go(t, s) {
+  ti = t; si = s;
+  const tr = TRACKS[t], sc = tr.scenes[s];
+  [...$("tracks").children].forEach((b, i) => b.setAttribute("aria-selected", i === t ? "true" : "false"));
+  $("stepno").textContent = `${t + 1}.${s + 1}`;
+  $("ntitle").textContent = sc.t;
+  $("ntags").innerHTML = (sc.tags || []).map(k => `<span class="tag ${k}">${UI.tags[k] || k}</span>`).join("");
+  $("nbody").innerHTML = sc.body || "";
+  const c = $("nconcept"); c.innerHTML = sc.concept || ""; c.hidden = !sc.concept;
+  const dots = $("dots"); dots.innerHTML = "";
+  tr.scenes.forEach((x, i) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = i + 1; b.title = x.t;
+    b.setAttribute("aria-label", UI.stepLabel(`${t + 1}.${i + 1}`, x.t));
+    if (i === s) b.setAttribute("aria-current", "true");
+    b.addEventListener("click", () => go(t, i)); dots.appendChild(b);
+  });
+  $("prev").disabled = t === 0 && s === 0;
+  const last = t === TRACKS.length - 1 && s === tr.scenes.length - 1;
+  $("next").disabled = last;
+  $("next").textContent = s === tr.scenes.length - 1 && !last ? UI.nextTrack(TRACKS[t + 1].name) : UI.next;
+  if (sc.code) showCode(sc.code);
+  play();
+  if (sc.wire) { try { sc.wire($("nbody")); } catch (e) { fail("scene " + (t + 1) + "." + (s + 1) + " wire(): " + e.message); } }
+  try { localStorage.setItem(storeKey, JSON.stringify([t, s])); } catch (e) {}
+}
+function step(d) {
+  let t = ti, s = si + d;
+  if (s >= TRACKS[t].scenes.length) { if (t + 1 >= TRACKS.length) return; t++; s = 0; }
+  if (s < 0) { if (t === 0) return; t--; s = TRACKS[t].scenes.length - 1; }
+  go(t, s);
+}
+const storeKey = "walk-pos:" + (W.id || W.title);
+
+// ---------- header ----------
+$("eyebrow").textContent = W.eyebrow || "";
+$("h1").textContent = W.title;
+$("thesis").innerHTML = W.thesis || "";
+$("links").innerHTML = (W.links || []).map(l => `<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("");
+$("prev").textContent = UI.prev; $("replay").textContent = UI.replay; $("keyhint").textContent = UI.keys;
+TRACKS.forEach((tr, i) => {
+  const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "tab");
+  b.textContent = `${i + 1}. ${tr.name}`; b.addEventListener("click", () => go(i, 0)); $("tracks").appendChild(b);
+});
+$("prev").addEventListener("click", () => step(-1));
+$("next").addEventListener("click", () => step(1));
+$("replay").addEventListener("click", play);
+document.addEventListener("keydown", e => {
+  if (e.target.closest && e.target.closest("input, textarea, select")) return;
+  if (e.key === "ArrowRight") step(1); else if (e.key === "ArrowLeft") step(-1);
+});
+
+// ---------- back matter ----------
+const after = $("after");
+function section(title, intro) {
+  const s = document.createElement("section"); s.className = "ref";
+  s.innerHTML = `<h2>${title}</h2>` + (intro ? `<p>${intro}</p>` : "");
+  after.appendChild(s); return s;
+}
+if (W.concepts && W.concepts.length) {
+  const s = section(W.conceptsTitle || UI.concepts);
+  const cards = document.createElement("div"); cards.className = "cards"; s.appendChild(cards);
+  W.concepts.forEach(cd => {
+    const d = document.createElement("div"); d.className = "panel card mono";
+    d.innerHTML = `<h3>${esc(cd.h)}</h3><p>${cd.p}</p>`;
+    if (cd.goto) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "goto";
+      b.textContent = UI.watch(cd.goto[0] + 1, cd.goto[1] + 1);
+      b.addEventListener("click", () => { go(cd.goto[0], cd.goto[1]); document.querySelector(".player").scrollIntoView({ behavior: "smooth", block: "start" }); });
+      d.appendChild(b);
+    }
+    cards.appendChild(d);
+  });
+}
+(W.sections || []).forEach(sec => {
+  const s = section(sec.title, sec.intro);
+  const box = document.createElement("div"); box.innerHTML = sec.html || ""; s.appendChild(box);
+});
+if (W.roadmap && W.roadmap.length) {
+  const s = section(W.roadmapTitle || UI.roadmap);
+  const ol = document.createElement("ol"); ol.className = "road"; s.appendChild(ol);
+  W.roadmap.forEach(r => {
+    const li = document.createElement("li"); li.className = "panel " + (r.status || "todo");
+    li.innerHTML = `<span><b>${r.title}</b>${r.text ? UI.sep + r.text : ""}</span><span class="st">${UI.status[r.status || "todo"]}</span>`;
+    ol.appendChild(li);
+  });
+}
+if (W.footnote) { const p = document.createElement("p"); p.className = "foot"; p.innerHTML = W.footnote; after.appendChild(p); }
+document.querySelectorAll(".goto[data-go]").forEach(b => b.addEventListener("click", () => {
+  const [t, s] = b.dataset.go.split(",").map(Number); go(t, s); document.querySelector(".player").scrollIntoView({ behavior: "smooth", block: "start" });
+}));
+
+// Start at #T.S when the link names a scene (e.g. page.html#2.3), else where this reader left off.
+let start = [0, 0];
+const hm = /^#(\d+)\.(\d+)$/.exec(location.hash);
+const valid = v => Array.isArray(v) && TRACKS[v[0]] && TRACKS[v[0]].scenes[v[1]];
+if (hm && valid([hm[1] - 1, hm[2] - 1])) start = [hm[1] - 1, hm[2] - 1];
+else { try { const v = JSON.parse(localStorage.getItem(storeKey) || "null"); if (valid(v)) start = v; } catch (e) {} }
+go(start[0], start[1]);
+})();
+</script>
+</body>
+</html>

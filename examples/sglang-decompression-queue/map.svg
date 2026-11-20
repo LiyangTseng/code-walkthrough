@@ -1,0 +1,33 @@
+<svg viewBox="0 0 760 440" role="img" aria-label="Requests, the decompression permit, and server memory" xmlns="http://www.w3.org/2000/svg">
+  <!-- client side: bodies not yet read -->
+  <rect class="box" id="client" x="8" y="8" width="150" height="424" rx="8"/>
+  <text class="lbl-strong" x="20" y="28">client / socket</text>
+  <text class="lbl" x="20" y="45">body not read yet</text>
+  <text class="lbl" x="20" y="342">a full TCP buffer</text>
+  <text class="lbl" x="20" y="360">pauses the client</text>
+
+  <!-- server -->
+  <rect class="box" id="server" x="170" y="8" width="582" height="424" rx="8"/>
+  <g class="layer" id="L0"><rect x="182" y="30" width="100" height="40" rx="6"/><text x="232" y="54">log</text></g>
+  <g class="layer" id="L1"><rect x="294" y="30" width="100" height="40" rx="6"/><text x="344" y="54">auth</text></g>
+  <g class="layer" id="L2"><rect x="406" y="30" width="100" height="40" rx="6"/><text x="456" y="54">decompress</text></g>
+  <g class="layer" id="L3"><rect x="518" y="30" width="100" height="40" rx="6"/><text x="568" y="54">DP relay</text></g>
+  <g class="layer" id="L4"><rect x="630" y="30" width="100" height="40" rx="6"/><text x="680" y="54">handler</text></g>
+  <path class="arrow" d="M282 50 h12 M394 50 h12 M506 50 h12 M618 50 h12"/>
+
+  <rect class="box" id="sem" x="182" y="84" width="268" height="112" rx="6"/>
+  <text class="lbl-strong" x="194" y="104">Semaphore (drawn with 1 permit)</text>
+  <text class="lbl" x="196" y="186">permit</text>
+  <text class="lbl" x="300" y="186">wait queue</text>
+
+  <rect class="box" id="pool" x="462" y="84" width="278" height="112" rx="6"/>
+  <text class="lbl-strong" x="474" y="104">spawn_blocking pool</text>
+  <text class="lbl" x="474" y="186">zstd decode: sync, CPU-bound</text>
+
+  <rect class="box" id="heap" x="182" y="208" width="558" height="214" rx="6"/>
+  <text class="lbl-strong" x="194" y="228">heap (server memory)</text>
+  <text class="lbl" x="214" y="246">compressed body (Bytes)</text>
+  <text class="lbl-strong" x="194" y="270">A</text>
+  <text class="lbl-strong" x="194" y="320">B</text>
+  <text class="lbl-strong" x="194" y="370">C</text>
+</svg>
