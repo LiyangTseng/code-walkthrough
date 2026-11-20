@@ -45,8 +45,9 @@ Work in a directory outside the user's repository (the scratchpad if there is on
    node <skill>/scripts/build.mjs walk.js --repo <checkout of the repo>
    ```
 
-   It pulls each source from git at the pinned commit, rejects ranges, zones and ids that do not exist, and prints the **fact-check list**: every `fact` scene with the lines it cites. Re-open each range and confirm the scene claims only what those lines show; retag or rewrite every scene that claims more.
-   Done when the build passes and every entry on the fact-check list is confirmed.
+   It pulls each source from git at the pinned commit, rejects ranges, zones and ids that do not exist, and prints the **fact-check list**: every `fact` scene with the lines it cites. A passing build proves only that the ranges exist, not that they are the right lines. Re-open each range and confirm the scene claims only what those lines show; fix the range, retag, or rewrite every scene that does not match.
+   Then look at the page. With a browser at hand, step through every scene (`page.html#2.3` opens track 2, scene 3; headless Chrome's `--screenshot` works too) and check that each frame puts the actors where the narration says they are.
+   Done when the build passes, every entry on the fact-check list is confirmed, and every scene's map matches its narration.
 
 7. **Deliver.** Publish the built HTML as an artifact when an artifact tool is available; otherwise give the user the file path to open in a browser. Reply with the thesis, the link, and the roadmap's next step. Keep `walk.js` and `map.svg`: rebuilding against a newer commit is how the page follows the code.
 

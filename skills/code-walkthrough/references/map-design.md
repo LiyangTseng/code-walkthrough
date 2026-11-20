@@ -40,6 +40,7 @@ map: {
 }
 ```
 
+- **Zones** are points in the SVG's viewBox units. An actor's anchor sits on the point: a token's or diamond's center, and for a chip row the center of its first chip, with the rest of the row extending 20 units each to the right. Tokens are 24 units across and chips 16, so leave that room inside the region you mean. A literal `[x, y]` in a frame works the same way.
 - **Tones:** `ink`, `muted`, `accent`, `warm`, `cool`, `good`, `bad`. Keep one meaning per tone across the page.
 - **Legend marks:** `token`, `chip`, `diamond`, `outline` (a warned region), `dash`, `line`. Every mark on the map gets an entry.
 

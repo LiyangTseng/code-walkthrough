@@ -30,7 +30,12 @@ const walkSrc = readFileSync(walkFile, "utf8");
 if (/<\/script/i.test(walkSrc)) err("walk.js contains a literal </script; write it as <\\/script");
 let W;
 try { W = vm.runInNewContext(walkSrc + "\n;WALK", {}, { filename: walkFile }); }
-catch (e) { console.error(`walk.js does not evaluate: ${e.message}`); process.exit(1); }
+catch (e) {
+  const at = (String(e.stack).match(new RegExp(walkFile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ":(\\d+)")) || [])[1];
+  console.error(`walk.js does not evaluate${at ? ` (line ${at})` : ""}: ${e.message}` +
+    (/is not defined/.test(e.message) ? "\n  a ${...} inside a backtick body is evaluated; write \\${ for a literal one" : ""));
+  process.exit(1);
+}
 
 for (const k of ["title", "thesis", "sources", "tracks", "map"]) if (!W[k]) err(`WALK.${k} is missing`);
 if (errors.length) { errors.forEach(e => console.error("error: " + e)); process.exit(1); }
@@ -67,7 +72,12 @@ else {
 const svgIds = new Set([...svgText.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
 const zones = W.map.zones || {};
 const actors = new Set((W.map.actors || []).map(a => a.id));
-for (const [z, xy] of Object.entries(zones)) if (!Array.isArray(xy) || xy.length !== 2) err(`zone "${z}" must be [x, y]`);
+const vb = (svgText.match(/viewBox="\s*([-\d.]+)[\s,]+([-\d.]+)[\s,]+([-\d.]+)[\s,]+([-\d.]+)/) || []).slice(1).map(Number);
+const inView = ([x, y]) => vb.length < 4 || (x >= vb[0] && y >= vb[1] && x <= vb[0] + vb[2] && y <= vb[1] + vb[3]);
+for (const [z, xy] of Object.entries(zones)) {
+  if (!Array.isArray(xy) || xy.length !== 2) err(`zone "${z}" must be [x, y]`);
+  else if (!inView(xy)) err(`zone "${z}" [${xy}] is outside the map's viewBox ${vb.join(" ")}`);
+}
 
 // ---------- scenes ----------
 const TAGS = new Set(["fact", "infer", "measure", "draft", "schematic"]);

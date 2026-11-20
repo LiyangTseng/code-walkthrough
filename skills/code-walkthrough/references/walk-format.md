@@ -1,6 +1,10 @@
 # walk.js format
 
-`walk.js` declares one object, `const WALK = { ... }`. The build evaluates it, fills in the sources from git, and inlines it into the player. Keep it data plus the optional `wire` and `onFrame` functions; nothing else runs at load. A complete example: [`examples/sglang-decompression-queue/walk.js`](../../../examples/sglang-decompression-queue/walk.js) in this skill's repository.
+`walk.js` declares one object, `const WALK = { ... }`. The build evaluates it, fills in the sources from git, and inlines it into the player. Keep it data plus the optional `wire` and `onFrame` functions; nothing else runs at load. A complete example: [`examples/sglang-decompression-queue/walk.js`](https://github.com/LiyangTseng/code-walkthrough/blob/main/examples/sglang-decompression-queue/walk.js).
+
+Required: `title`, `thesis`, `sources`, `map`, `tracks`. Everything else is optional; leave out what the walkthrough does not use.
+
+Write `body`, `concept` and section HTML as backtick template literals, and write a literal `${` inside them as `\${`: the build evaluates the file, so `${id}` in prose fails with "id is not defined".
 
 ```js
 const WALK = {
@@ -20,7 +24,7 @@ const WALK = {
 };
 ```
 
-`blobUrl(path, a, b)` may replace `repoUrl` for a host whose links are not GitHub-shaped. With no `sha`, sources come from the working tree and the page shows them as unpinned; use that only for uncommitted code.
+Take `repoUrl` from `git remote get-url origin` (as an `https://` URL). With no remote, leave it out: the page then shows no GitHub links. `blobUrl(path, a, b)` may replace `repoUrl` for a host whose links are not GitHub-shaped. With no `sha`, sources come from the working tree and the page shows them as unpinned; use that only for uncommitted code.
 
 ## sources
 

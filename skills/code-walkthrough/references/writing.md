@@ -2,7 +2,7 @@
 
 ## Tracks
 
-A track is one story the traveler lives through. Two to four tracks, four to ten scenes each:
+A track is one story the traveler lives through. Aim for two to four tracks of three to ten scenes; the build warns past fourteen. Tracks 3 and 4 are for tasks that have them: no tests on the path, no track 3.
 
 1. **The happy path, end to end.** One traveler from the entry point to where the task's change lands. The reader builds the mental model here, before anything goes wrong.
 2. **The task's scenario.** The same path under the conditions the task is about: three requests at once, the failing input, the second rank, the feature that is missing. The thesis happens on the map in this track, on a scene whose map warns the region where it happens.
