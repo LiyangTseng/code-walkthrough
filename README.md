@@ -4,6 +4,8 @@ English | [繁體中文](README.zh-TW.md)
 
 An agent skill that builds an interactive walkthrough of a codebase before you change it. Point it at a GitHub issue (or a PR, a bug report, a question) and it follows one concrete traveler, such as a request, a token or a batch, through the real code pinned at a commit, until you can see why the task exists and where it lands.
 
+**[Try the live example](https://liyangtseng.github.io/code-walkthrough/examples/sglang-decompression-queue.html)**: step through it with ← →.
+
 ![A walkthrough: pinned source on the left with the explained lines highlighted, an animated map and the narration on the right](docs/screenshot.png)
 
 Each page has:
@@ -47,11 +49,13 @@ Pages come in English or Traditional Chinese labels out of the box, and the narr
 
 ## Example
 
-[`examples/sglang-decompression-queue`](examples/sglang-decompression-queue) walks through an [sglang](https://github.com/sgl-project/sglang) issue: why queued request decompressions still hold their whole body in memory. Build it from an sglang checkout:
+[`examples/sglang-decompression-queue`](examples/sglang-decompression-queue) walks through an [sglang](https://github.com/sgl-project/sglang) issue: why queued request decompressions still hold their whole body in memory. [Open it live](https://liyangtseng.github.io/code-walkthrough/examples/sglang-decompression-queue.html), or rebuild it from an sglang checkout:
 
 ```bash
-node skills/code-walkthrough/scripts/build.mjs examples/sglang-decompression-queue/walk.js --repo ~/path/to/sglang
+node skills/code-walkthrough/scripts/build.mjs examples/sglang-decompression-queue/walk.js --repo ~/path/to/sglang --out docs/examples/sglang-decompression-queue.html
 ```
+
+GitHub Pages serves `docs/`, so the rebuilt page goes live when it is pushed.
 
 ## Layout
 

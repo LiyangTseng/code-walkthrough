@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>code-walkthrough examples</title>
+<style>
+:root { --bg: #f1f3f5; --panel: #fff; --ink: #19212b; --muted: #5b6574; --line: #d6dce3; --accent: #0b7682; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e131a; --panel: #151c25; --ink: #e5eaf1; --muted: #9ba7b6; --line: #29333f; --accent: #3cc4cd; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #0e131a; --panel: #151c25; --ink: #e5eaf1; --muted: #9ba7b6; --line: #29333f; --accent: #3cc4cd; color-scheme: dark; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, sans-serif; padding: 48px 16px; }
+main { max-width: 720px; margin: 0 auto; display: grid; gap: 20px; }
+h1 { margin: 0; font-size: 30px; }
+p { margin: 0; color: var(--muted); }
+a { color: var(--accent); }
+.card { display: grid; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; text-decoration: none; color: var(--ink); }
+.card:hover, .card:focus-visible { border-color: var(--accent); outline: none; }
+.card b { font-size: 17px; }
+.card span { color: var(--muted); font-size: 14.5px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>code-walkthrough examples</h1>
+  <p>Pages built by the <a href="https://github.com/LiyangTseng/code-walkthrough">code-walkthrough</a> agent skill: one traveler followed through real code pinned at a commit.</p>
+  <a class="card" href="examples/sglang-decompression-queue.html">
+    <b>Decompression queue memory</b>
+    <span>sglang #49055, item 9: why queued request decompressions still hold their whole body in memory. Rust, axum, tokio.</span>
+  </a>
+</main>
+</body>
+</html>

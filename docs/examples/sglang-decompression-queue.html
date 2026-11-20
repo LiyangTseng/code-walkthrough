@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Decompression queue memory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* code-walkthrough player. Layout: pinned source on the left, animated map + narration on the right; one column below 1000px.
+   Page-specific content comes from the WALK object (walk.js) and the map SVG; this file is shared by every walkthrough. */
+:root {
+  --bg: #f1f3f5; --panel: #ffffff; --ink: #19212b; --muted: #5b6574; --line: #d6dce3;
+  --accent: #0b7682; --accent-soft: rgba(11,118,130,.10);
+  --warm: #b8730a; --warm-soft: rgba(184,115,10,.14);
+  --cool: #4a43d8; --cool-soft: rgba(74,67,216,.12);
+  --good: #2e7d4f; --good-soft: rgba(46,125,79,.13);
+  --bad: #b23a1e; --bad-soft: rgba(178,58,30,.10);
+  --code-bg: #f8f9fb; --hl: rgba(11,118,130,.13);
+  --k: #9b1f6e; --s: #2c7a34; --c: #7b8593; --n: #a85a06; --t: #1f63b8; --m: #0b7682; --lt: #8a5a00;
+  --font-body: "IBM Plex Sans", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-head: "IBM Plex Sans", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e131a; --panel: #151c25; --ink: #e5eaf1; --muted: #9ba7b6; --line: #29333f;
+  --accent: #3cc4cd; --accent-soft: rgba(60,196,205,.12);
+  --warm: #f0aa3c; --warm-soft: rgba(240,170,60,.16);
+  --cool: #9091fa; --cool-soft: rgba(144,145,250,.16);
+  --good: #6cc28f; --good-soft: rgba(108,194,143,.16);
+  --bad: #ef8a6a; --bad-soft: rgba(239,138,106,.14);
+  --code-bg: #111821; --hl: rgba(60,196,205,.15);
+  --k: #f07ab8; --s: #8fd18e; --c: #7d8896; --n: #f4b46a; --t: #7fb4ff; --m: #3cc4cd; --lt: #e6b45c;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e131a; --panel: #151c25; --ink: #e5eaf1; --muted: #9ba7b6; --line: #29333f;
+  --accent: #3cc4cd; --accent-soft: rgba(60,196,205,.12);
+  --warm: #f0aa3c; --warm-soft: rgba(240,170,60,.16);
+  --cool: #9091fa; --cool-soft: rgba(144,145,250,.16);
+  --good: #6cc28f; --good-soft: rgba(108,194,143,.16);
+  --bad: #ef8a6a; --bad-soft: rgba(239,138,106,.14);
+  --code-bg: #111821; --hl: rgba(60,196,205,.15);
+  --k: #f07ab8; --s: #8fd18e; --c: #7d8896; --n: #f4b46a; --t: #7fb4ff; --m: #3cc4cd; --lt: #e6b45c;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 64px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 30px; }
+a { color: var(--accent); }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+h1, h2, h3 { font-family: var(--font-head); text-wrap: balance; margin: 0; line-height: 1.3; }
+[hidden] { display: none !important; }
+
+header.top { display: grid; gap: 10px; max-width: 920px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 700; }
+.thesis { font-size: clamp(17px, 2.1vw, 21px); font-weight: 500; line-height: 1.55; margin: 4px 0 0; padding-left: 14px; border-left: 3px solid var(--warm); }
+.thesis b { color: var(--warm); font-weight: 700; }
+.links { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--muted); }
+.fail { border: 1px solid var(--bad); background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 10px 14px; font-family: var(--font-mono); font-size: 13px; white-space: pre-wrap; }
+
+.tracks { display: flex; flex-wrap: wrap; gap: 8px; }
+.tracks button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 7px 14px; border-radius: 999px; cursor: pointer; }
+.tracks button[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.player { display: grid; gap: 18px; grid-template-columns: 1fr; grid-template-areas: "side" "code"; }
+@media (min-width: 1000px) { .player { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); grid-template-areas: "code side"; align-items: start; } }
+.side { grid-area: side; display: grid; gap: 18px; min-width: 0; align-content: start; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+
+.code { grid-area: code; display: flex; flex-direction: column; overflow: hidden; }
+@media (min-width: 1000px) { .code { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); } }
+.code-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.code-file { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.code-file b { color: var(--ink); font-weight: 600; }
+.code-head a { font-size: 12.5px; white-space: nowrap; }
+.code-body { position: relative; overflow: auto; background: var(--code-bg); font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; max-height: 520px; padding: 8px 0; }
+@media (min-width: 1000px) { .code-body { max-height: none; flex: 1; } }
+.ln { display: grid; grid-template-columns: 50px auto; white-space: pre; border-left: 3px solid transparent; transition: background .25s; }
+.ln .no { color: var(--c); text-align: right; padding-right: 12px; user-select: none; opacity: .75; }
+.ln .tx { padding-right: 16px; }
+.ln.on { background: var(--hl); border-left-color: var(--accent); }
+.ln.on .no { color: var(--accent); opacity: 1; font-weight: 600; }
+.code-body.has-on .ln:not(.on) .tx { opacity: .55; }
+.k { color: var(--k); } .s { color: var(--s); } .c { color: var(--c); font-style: italic; } .n { color: var(--n); } .t { color: var(--t); } .m { color: var(--m); } .lt { color: var(--lt); }
+
+.stage { padding: 12px; display: grid; gap: 10px; }
+.stage-scroll { overflow-x: auto; }
+.stage-scroll > svg { display: block; width: 100%; min-width: 600px; height: auto; font-family: var(--font-body); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); padding: 0 4px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.meters { display: flex; flex-wrap: wrap; gap: 8px; }
+.meters:empty { display: none; }
+.meter { border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; display: grid; min-width: 0; }
+.meter .mk { font-size: 11.5px; color: var(--muted); }
+.meter .mv { font-family: var(--font-mono); font-weight: 600; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.meter.bad { border-color: var(--bad); background: var(--bad-soft); } .meter.bad .mv { color: var(--bad); }
+.meter.good { border-color: var(--good); background: var(--good-soft); } .meter.good .mv { color: var(--good); }
+.meter.key { border-color: var(--accent); background: var(--accent-soft); } .meter.key .mv { color: var(--accent); }
+
+/* Map vocabulary: author SVGs use these classes; ids on .box / .layer are what scenes focus or warn. */
+svg .box { fill: none; stroke: var(--line); stroke-width: 1.2; transition: stroke .3s, fill .3s; }
+svg .layer rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; transition: stroke .3s, fill .3s; }
+svg .layer text { fill: var(--ink); font-size: 12px; text-anchor: middle; }
+svg .box.focus, svg .layer.focus rect { stroke: var(--accent); stroke-width: 2; fill: var(--accent-soft); }
+svg .box.warn, svg .layer.warn rect { stroke: var(--bad); stroke-width: 2; fill: var(--bad-soft); }
+svg .lbl { fill: var(--muted); font-size: 11.5px; }
+svg .lbl-strong { fill: var(--ink); font-size: 12.5px; font-weight: 600; }
+svg .arrow { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+svg .lane { stroke: var(--muted); stroke-width: 1.2; fill: none; stroke-dasharray: 3 3; }
+svg .note { fill: var(--ink); font-size: 12.5px; font-weight: 500; }
+svg .actor { transition: transform .6s cubic-bezier(.4,.1,.2,1), opacity .35s; }
+svg .actor.glow > :not(text) { stroke: var(--ink); stroke-width: 2; }
+svg .actor text { font-size: 12px; font-weight: 600; text-anchor: middle; dominant-baseline: central; fill: var(--bg); }
+svg .actor.chip text { font-size: 9.5px; }
+.tone-ink { fill: var(--ink); } .tone-muted { fill: var(--muted); } .tone-accent { fill: var(--accent); }
+.tone-warm { fill: var(--warm); } .tone-cool { fill: var(--cool); } .tone-good { fill: var(--good); } .tone-bad { fill: var(--bad); }
+
+.narr { padding: 18px 20px 20px; display: grid; gap: 12px; }
+.narr-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.stepno { font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 600; }
+.narr h2 { font-size: 21px; font-weight: 700; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: 12px; padding: 1px 9px; border-radius: 999px; border: 1px solid currentColor; }
+.tag.fact { color: var(--accent); } .tag.infer { color: var(--warm); } .tag.measure { color: var(--cool); } .tag.draft, .tag.schematic { color: var(--muted); }
+.narr-body { max-width: 70ch; }
+.narr-body p { margin: 0 0 10px; }
+.narr-body p:last-child { margin-bottom: 0; }
+.narr-body ul, .narr-body ol { margin: 0 0 10px; padding-left: 20px; }
+.narr-body pre { font-family: var(--font-mono); font-size: 12.5px; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; margin: 0 0 10px; line-height: 1.55; }
+.concept { border: 1px dashed var(--line); border-radius: 8px; padding: 10px 14px; background: var(--bg); font-size: 14px; }
+.concept .ct { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .05em; display: block; margin-bottom: 2px; }
+.calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 10px; }
+.calc label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.calc input { font: inherit; font-family: var(--font-mono); padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); width: 100%; }
+.calc-out { font-size: 15.5px; font-weight: 500; padding: 10px 12px; border-radius: 8px; background: var(--warm-soft); }
+.calc-out b { font-family: var(--font-mono); color: var(--warm); font-size: 17px; }
+
+.ctrl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; }
+.ctrl button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+.ctrl button.primary { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+.ctrl button:disabled { opacity: .4; cursor: default; }
+.dots { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; min-width: 120px; }
+.dots button { width: 22px; height: 22px; padding: 0; border-radius: 50%; font-size: 10.5px; font-family: var(--font-mono); color: var(--muted); }
+.dots button[aria-current="true"] { background: var(--accent); color: var(--panel); border-color: var(--accent); }
+.hint { font-size: 12px; color: var(--muted); }
+
+section.ref { display: grid; gap: 14px; }
+section.ref > h2 { font-size: 22px; }
+section.ref > p { margin: 0; max-width: 76ch; color: var(--muted); }
+.tbl-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 700; font-size: 13px; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td .g, .g { color: var(--good); font-weight: 600; } td .b, .b { color: var(--bad); font-weight: 600; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+.card { padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.card h3 { font-size: 15px; font-weight: 700; }
+.card.mono h3 { font-family: var(--font-mono); font-weight: 600; }
+.card p { margin: 0; font-size: 14px; }
+.card ul { margin: 0; padding-left: 18px; font-size: 14px; }
+.card .goto { font: inherit; font-size: 12.5px; justify-self: start; background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; }
+ol.road { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; counter-reset: r; max-width: 920px; }
+ol.road li { counter-increment: r; display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: baseline; padding: 10px 14px; }
+ol.road li::before { content: counter(r); font-family: var(--font-mono); font-weight: 600; color: var(--muted); }
+ol.road li.done::before, ol.road li.done .st { color: var(--accent); }
+ol.road .st { font-size: 12px; color: var(--muted); white-space: nowrap; }
+ol.road li.next .st { color: var(--warm); font-weight: 700; }
+.foot { font-size: 13px; color: var(--muted); max-width: 920px; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { svg .actor, .ln, svg .box, svg .layer rect { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow" id="eyebrow"></div>
+    <h1 id="h1"></h1>
+    <p class="thesis" id="thesis"></p>
+    <div class="links" id="links"></div>
+  </header>
+  <div class="fail" id="fail" hidden></div>
+
+  <div class="tracks" role="tablist" id="tracks"></div>
+
+  <div class="player">
+    <div class="panel code">
+      <div class="code-head">
+        <div class="code-file" id="code-file"></div>
+        <a id="code-gh" target="_blank" rel="noopener"></a>
+      </div>
+      <div class="code-body" id="code-body"></div>
+    </div>
+    <div class="side">
+      <div class="panel stage">
+        <div class="stage-scroll" id="stage">
+<svg viewBox="0 0 760 440" role="img" aria-label="Requests, the decompression permit, and server memory" xmlns="http://www.w3.org/2000/svg">
+  <!-- client side: bodies not yet read -->
+  <rect class="box" id="client" x="8" y="8" width="150" height="424" rx="8"/>
+  <text class="lbl-strong" x="20" y="28">client / socket</text>
+  <text class="lbl" x="20" y="45">body not read yet</text>
+  <text class="lbl" x="20" y="342">a full TCP buffer</text>
+  <text class="lbl" x="20" y="360">pauses the client</text>
+
+  <!-- server -->
+  <rect class="box" id="server" x="170" y="8" width="582" height="424" rx="8"/>
+  <g class="layer" id="L0"><rect x="182" y="30" width="100" height="40" rx="6"/><text x="232" y="54">log</text></g>
+  <g class="layer" id="L1"><rect x="294" y="30" width="100" height="40" rx="6"/><text x="344" y="54">auth</text></g>
+  <g class="layer" id="L2"><rect x="406" y="30" width="100" height="40" rx="6"/><text x="456" y="54">decompress</text></g>
+  <g class="layer" id="L3"><rect x="518" y="30" width="100" height="40" rx="6"/><text x="568" y="54">DP relay</text></g>
+  <g class="layer" id="L4"><rect x="630" y="30" width="100" height="40" rx="6"/><text x="680" y="54">handler</text></g>
+  <path class="arrow" d="M282 50 h12 M394 50 h12 M506 50 h12 M618 50 h12"/>
+
+  <rect class="box" id="sem" x="182" y="84" width="268" height="112" rx="6"/>
+  <text class="lbl-strong" x="194" y="104">Semaphore (drawn with 1 permit)</text>
+  <text class="lbl" x="196" y="186">permit</text>
+  <text class="lbl" x="300" y="186">wait queue</text>
+
+  <rect class="box" id="pool" x="462" y="84" width="278" height="112" rx="6"/>
+  <text class="lbl-strong" x="474" y="104">spawn_blocking pool</text>
+  <text class="lbl" x="474" y="186">zstd decode: sync, CPU-bound</text>
+
+  <rect class="box" id="heap" x="182" y="208" width="558" height="214" rx="6"/>
+  <text class="lbl-strong" x="194" y="228">heap (server memory)</text>
+  <text class="lbl" x="214" y="246">compressed body (Bytes)</text>
+  <text class="lbl-strong" x="194" y="270">A</text>
+  <text class="lbl-strong" x="194" y="320">B</text>
+  <text class="lbl-strong" x="194" y="370">C</text>
+</svg>
+
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="meters" id="meters" aria-live="polite"></div>
+      </div>
+      <div class="panel narr" aria-live="polite">
+        <div class="narr-head"><span class="stepno" id="stepno"></span><h2 id="ntitle"></h2></div>
+        <div class="tags" id="ntags"></div>
+        <div class="narr-body" id="nbody"></div>
+        <div class="concept" id="nconcept"></div>
+        <div class="ctrl">
+          <button id="prev" type="button"></button>
+          <button id="next" type="button" class="primary"></button>
+          <button id="replay" type="button"></button>
+          <div class="dots" id="dots"></div>
+          <span class="hint" id="keyhint"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="after" class="wrap" style="gap:30px"></div>
+</div>
+
+<script>
+// Example walkthrough: why queued decompressions still hold their whole body in memory
+// (sgl-project/sglang issue #49055, item 9). Build from an sglang checkout:
+//   node ../../skills/code-walkthrough/scripts/build.mjs walk.js --repo ~/path/to/sglang
+const RD = "rd", APP = "app";
+
+const WALK = {
+  id: "sglang-49055-item9",
+  title: "Decompression queue memory",
+  ui: "en",
+  eyebrow: "sgl-project/sglang #49055 · item 9 · rust/sglang-server",
+  thesis: "The semaphore caps how many bodies decompress at once, but each request reads its <b>whole compressed body into memory before it waits</b> for a permit.",
+  repoUrl: "https://github.com/sgl-project/sglang",
+  sha: "51401babd16ead3e5ea39f6c5a4daba050066872",
+  links: [
+    { label: "issue #49055", href: "https://github.com/sgl-project/sglang/issues/49055" },
+    { label: "Python version, L60-74", href: "https://github.com/sgl-project/sglang/blob/51401babd16ead3e5ea39f6c5a4daba050066872/python/sglang/srt/entrypoints/http_request_decompression.py#L60-L74" },
+  ],
+  sources: {
+    rd: { path: "rust/sglang-server/src/api_server/http/request_decompression.rs" },
+    app: { path: "rust/sglang-server/src/api_server/http/app.rs", lines: [176, 221] },
+  },
+
+  map: {
+    svg: "map.svg",
+    note: [196, 410],
+    zones: {
+      clientA: [30, 110], clientB: [30, 200], clientC: [30, 290],
+      sockA: [64, 110], sockB: [64, 200], sockC: [64, 290],
+      heapA: [222, 266], heapB: [222, 316], heapC: [222, 366],
+      L0: [232, 50], L1: [344, 50], L2: [456, 50], L3: [568, 50], L4: [680, 50],
+      acquire: [215, 150], q0: [300, 150], q1: [340, 150], pool: [560, 150],
+    },
+    actors: [
+      { id: "A", label: "A" }, { id: "B", label: "B" }, { id: "C", label: "C" },
+      { id: "bodyA", kind: "chip", count: 4, tone: "warm" },
+      { id: "bodyB", kind: "chip", count: 4, tone: "warm" },
+      { id: "bodyC", kind: "chip", count: 4, tone: "warm" },
+      { id: "permit", kind: "diamond", tone: "accent" },
+    ],
+    legend: [
+      { mark: "token", tone: "ink", text: "A / B / C: one request (its headers)" },
+      { mark: "chip", tone: "warm", text: "one chunk of a compressed body" },
+      { mark: "diamond", tone: "accent", text: "decompression permit" },
+    ],
+  },
+
+  tracks: [
+    { name: "One request end to end", scenes: [
+      { t: "The request crosses the layers outside-in", code: { f: APP, r: [[181, 181], [201, 206]] }, tags: ["fact"],
+        frames: [
+          { at: { A: "clientA", bodyA: "sockA", permit: "acquire" } },
+          { at: { A: "L0" }, focus: ["L0"] }, { at: { A: "L1" }, focus: ["L1"] }, { at: { A: "L2" }, focus: ["L2"] },
+        ],
+        body: `<p>Each <code>.layer(...)</code> or <code>xxx::apply(app, ...)</code> in <code>app.rs</code> wraps <strong>everything built so far</strong>, so the later a layer is added, the further out it sits. A request passes log → auth → decompress → DP relay → handler.</p>
+<p>When the request reaches a middleware, only its <strong>headers</strong> are known to be read. The four body chunks are still in the socket.</p>
+<p>Line 205 says auth sits outside decompression, so an unauthenticated body is never inflated. Line 181 disables the body size limit, as the Python server does.</p>`,
+        concept: `<span class="ct">Onion model</span>Tower layers nest like an onion: requests go in from the outermost layer, responses come back out. <code>app.layer(X)</code> always puts X on the outside.` },
+
+      { t: "No x-body-compressed header: pass straight through", code: { f: RD, r: [[63, 71]] }, tags: ["fact"],
+        frames: [{ at: { A: "L2", bodyA: "sockA", permit: "acquire" }, focus: ["L2"] }],
+        body: `<p>Three outcomes:</p>
+<ol><li>No header: <code>next.run(request)</code> hands the request inward untouched. A normal request pays one header lookup.</li>
+<li>A method other than <code>zstd</code>: a plain-text 400 with Python's message.</li>
+<li><code>zstd</code>: carry on to the body.</li></ol>`,
+        concept: `<span class="ct">let-else</span><code>let Some(m) = ... else { return ...; };</code> binds when the pattern matches; otherwise the <code>else</code> block runs and must leave the function.` },
+
+      { t: "Headers and body split: the body is still lazy", code: { f: RD, r: [[73, 74], [88, 88]] }, tags: ["fact"],
+        frames: [{ at: { A: "L2", bodyA: "sockA", permit: "acquire" }, focus: ["L2"], glow: ["bodyA"], note: "The body stays in the socket until someone polls it" }],
+        body: `<p><code>into_parts()</code> splits the <code>Request</code> into <code>Parts</code> (method, URI, headers) and a <code>Body</code>.</p>
+<p><code>Body</code> is a <strong>stream</strong>: data arrives only as it is polled. Until then the bytes sit in the kernel's socket buffer, or the client has not sent them; when the buffer fills, TCP flow control pauses the client.</p>
+<p>So when to read is the code's choice. Any fix for this item uses that.</p>`,
+        concept: `<span class="ct">poll</span>Rust futures and streams do nothing until polled. <code>.await</code> polls until the result is <code>Ready</code>.` },
+
+      { t: "to_bytes reads the whole compressed body into the heap", code: { f: RD, r: [[89, 94]] }, tags: ["fact"],
+        frames: [
+          { at: { A: "L2", bodyA: "sockA", permit: "acquire" }, focus: ["L2"] },
+          { at: { bodyA: "heapA" }, focus: ["heap"], note: "A's compressed body is now in the heap" },
+        ],
+        body: `<p><code>axum::body::to_bytes(body, usize::MAX)</code> polls the body to its end and collects it into one <code>Bytes</code>, with no size cap.</p>
+<p><strong>This is where item 9 starts:</strong> it runs <strong>before</strong> the permit is taken on line 95. From here on, the request holds its whole compressed body.</p>
+<p>Lines 92-94: an empty body returns early without a permit.</p>`,
+        concept: `<span class="ct">Bytes</span><code>bytes::Bytes</code> is an immutable byte buffer whose <code>clone</code> only bumps a reference count. axum and hyper pass bodies around as <code>Bytes</code>.` },
+
+      { t: "acquire_owned takes a permit", code: { f: RD, r: [[95, 98], [36, 43]] }, tags: ["fact", "schematic"],
+        frames: [
+          { at: { A: "L2", bodyA: "heapA", permit: "acquire" }, focus: ["sem"] },
+          { at: { A: "acquire", permit: "@A" } },
+        ],
+        body: `<p>The <code>Semaphore</code> holds N permits, N = <code>python_executor_workers()</code> = min(32, CPUs + 4) (lines 36-43), the worker count of Python's default executor. The map draws one.</p>
+<p>A free permit is granted at once; otherwise the task <strong>sleeps in a FIFO queue</strong> and uses no CPU.</p>
+<p><code>acquire_owned</code> rather than <code>acquire</code>: the owned permit holds its own <code>Arc</code> and is <code>'static</code>, so it can move into <code>spawn_blocking</code>.</p>`,
+        concept: `<span class="ct">RAII</span>Nobody returns the permit by hand: dropping it returns it to the semaphore and wakes the next waiter.` },
+
+      { t: "spawn_blocking moves the decode off the async workers", code: { f: RD, r: [[99, 105]] }, tags: ["fact"],
+        frames: [
+          { at: { A: "acquire", bodyA: "heapA", permit: "@A" }, focus: ["pool"] },
+          { at: { A: "pool" } },
+        ],
+        body: `<p>zstd decoding is synchronous and CPU-bound. On an async worker it would stall every other task on that thread, so <code>spawn_blocking</code> runs it on the blocking pool. The semaphore, not the pool, limits how many run at once.</p>
+<p><code>let _permit = permit;</code> moves the permit into the closure, so it is returned when the closure ends. <code>compressed</code> moves in too and is freed at the same moment.</p>`,
+        concept: `<span class="ct">_permit is not _</span><code>let _permit = permit;</code> keeps the value alive to the end of scope. <code>let _ = permit;</code> drops it on that line, returning the permit at once and disabling the limit.` },
+
+      { t: "The permit returns; the handler gets the decompressed body", code: { f: RD, r: [[81, 85], [99, 102]] }, tags: ["fact"],
+        frames: [
+          { at: { A: "pool", bodyA: "heapA", permit: "@A" } },
+          { at: { A: "L3", bodyA: "hidden", permit: "acquire" }, focus: ["L3"], note: "Closure ends: _permit and compressed drop together" },
+          { at: { A: "L4" }, focus: ["L4"], note: "The handler receives the decompressed body" },
+        ],
+        body: `<p>When the closure ends, <code>_permit</code> and <code>compressed</code> drop: the permit wakes the next waiter and the compressed body is freed.</p>
+<p>Back on the async side the header is removed, <code>content-length</code> is set to the decompressed length, and the rebuilt request goes inward.</p>
+<p>The permit is returned <strong>before</strong> the handler runs: the semaphore governs decompression only.</p>` },
+    ] },
+
+    { name: "Three requests at once", scenes: [
+      { t: "A is decoding when B and C arrive", code: { f: RD, r: [[99, 102]] }, tags: ["schematic"],
+        frames: [
+          { at: { A: "pool", bodyA: "heapA", permit: "@A" } },
+          { at: { B: "clientB", C: "clientC", bodyB: "sockB", bodyC: "sockC" } },
+        ],
+        body: `<p>The map has one permit. A holds it and is decoding on the blocking pool.</p>
+<p>B's and C's headers arrive; their bodies are still in their sockets.</p>`,
+        concept: `<span class="ct">On a real server</span>There are min(32, CPUs + 4) permits, so queueing starts only past that many concurrent requests, and the queue itself has no bound.` },
+
+      { t: "B and C go straight into to_bytes", code: { f: RD, r: [[89, 91]] }, tags: ["fact"], carry: true,
+        frames: [
+          { at: { B: "L2", C: "L2" }, focus: ["L2"] },
+          { at: { bodyB: "heapB", bodyC: "heapC" }, focus: ["heap"], note: "B's and C's bodies are read while A still holds the permit" },
+        ],
+        body: `<p>The first thing <code>decompress_zstd</code> does is read the body, and that step ignores the permit. B's and C's compressed bodies land in the heap whether or not a permit is free.</p>`,
+        concept: `<span class="ct">Concurrency</span>Each connection is its own tokio task, so B's and C's <code>to_bytes</code> run while A decodes.` },
+
+      { t: "B and C queue: CPU is capped, memory is not", code: { f: RD, r: [[95, 98]] }, tags: ["fact", "measure"], carry: true,
+        frames: [
+          { at: { B: "q0", C: "q1" }, focus: ["sem"] },
+          { glow: ["bodyB", "bodyC"], focus: ["sem", "heap"], warn: ["heap"], note: "Still queued, still holding their bodies" },
+        ],
+        body: `<p>B and C sleep in <code>acquire_owned().await</code> and use no CPU, but their <code>compressed</code> buffers are already in the heap and stay there until each finishes decoding.</p>
+<p><strong>This is item 9:</strong> concurrent decodes are capped at P, the memory of queued bodies is not.</p>
+<p>The order of the code is verified. That the queued bodies are fully read still needs a measurement: a body stream that records each poll.</p>`,
+        concept: `<span class="ct">Admission control</span>Deciding when a request may start consuming a resource. Here admission happens after the memory is already spent.` },
+
+      { t: "Scale it to N requests", code: { f: RD, r: [[36, 43], [89, 98]] }, tags: ["infer", "measure"],
+        frames: [{ at: { A: "L4", B: "pool", C: "q0", bodyB: "heapB", bodyC: "heapC", permit: "@B" }, glow: ["bodyC"], focus: ["heap"], note: "queued bytes ≈ (N − P) × S" }],
+        body: `<p>N concurrent requests, S MiB compressed each, P permits: up to about (N − P) × S of compressed bodies wait in the heap.</p>
+<div class="calc">
+  <label>Concurrent requests N<input id="calc-n" type="number" min="1" value="200"></label>
+  <label>Compressed size S (MiB)<input id="calc-s" type="number" min="0" value="64"></label>
+  <label>Permits P<input id="calc-p" type="number" min="1" max="32" value="12"></label>
+</div>
+<div class="calc-out" id="calc-out"></div>
+<p>An arithmetic bound, not a measurement.</p>`,
+        wire(root) {
+          const n = root.querySelector("#calc-n"), s = root.querySelector("#calc-s"), p = root.querySelector("#calc-p"), out = root.querySelector("#calc-out");
+          const fmt = mib => mib >= 1024 ? `${(mib / 1024).toFixed(1)} GiB` : `${Math.round(mib)} MiB`;
+          const upd = () => { const q = Math.max(0, (+n.value || 0) - Math.max(1, +p.value || 1)); out.innerHTML = `${q} requests queued, holding about <b>${fmt(q * (+s.value || 0))}</b>`; };
+          [n, s, p].forEach(x => x.addEventListener("input", upd)); upd();
+        } },
+
+      { t: "Preview, option A: take the permit before reading the body", code: { f: RD, r: [[89, 98]] }, tags: ["draft"],
+        frames: [
+          { at: { A: "pool", bodyA: "heapA", permit: "@A", B: "L2", C: "L2", bodyB: "sockB", bodyC: "sockC" } },
+          { at: { B: "q0", C: "q1" }, focus: ["sem"], glow: ["bodyB", "bodyC"], note: "Option A: queued bodies stay in the socket" },
+        ],
+        body: `<p>Move lines 95-98 above line 89, and a queued request holds only its headers; its body waits in the socket and TCP pauses the client.</p>
+<p>The cost: the body is read after the permit is granted, so a slow uploader holds a permit and blocks the queue behind it.</p>`,
+        concept: `<span class="ct">Slowloris</span>An attack that sends data slowly to keep server resources tied up. Option A lets a slow client pin a permit.` },
+    ] },
+  ],
+
+  concepts: [
+    { h: "Body (lazy stream)", p: "Only headers are known to be read; the body leaves the socket as it is polled.", goto: [0, 2] },
+    { h: "to_bytes", p: "Polls to the end and collects one Bytes. Item 9 is that it runs before the permit.", goto: [0, 3] },
+    { h: "OwnedSemaphorePermit", p: "Holds an Arc, so it is 'static and can move to another thread; dropping it returns the permit.", goto: [0, 4] },
+    { h: "spawn_blocking", p: "Runs sync, CPU-bound work off the async workers. let _permit keeps the permit; let _ drops it.", goto: [0, 5] },
+  ],
+
+  sections: [
+    { title: "Design options (draft, not decided)", intro: "Green is better than today; red is a new cost.",
+      html: `<div class="tbl-wrap"><table>
+<thead><tr><th>Option</th><th>Memory while queued</th><th>New cost</th></tr></thead>
+<tbody>
+<tr><td><b>Today</b></td><td>Whole compressed body per queued request</td><td>None</td></tr>
+<tr><td><b>A: permit first</b></td><td><span class="g">Headers only</span></td><td><span class="b">A slow uploader holds a permit</span></td></tr>
+<tr><td><b>B: admit by bytes</b></td><td><span class="g">Bounded by a byte budget</span></td><td><span class="b">No Content-Length, bodies over the budget, acquire_many takes u32</span></td></tr>
+</tbody></table></div>` },
+  ],
+
+  roadmap: [
+    { title: "Understand the path", text: "this page.", status: "done" },
+    { title: "Build and test locally", text: "cargo test, clippy, fmt.", status: "next" },
+    { title: "Measure before", text: "a counting GlobalAlloc, and a body stream that records polls.", status: "todo" },
+    { title: "Choose a design", text: "A, B, or a mix, with the maintainers on the issue.", status: "todo" },
+    { title: "Implement, add a regression test, measure after", status: "todo" },
+  ],
+  footnote: "Out of scope: the DP relay buffering the whole body again (item 2). Every inference on this page is tagged as such and not yet measured.",
+};
+
+;WALK.sha = "51401babd16ead3e5ea39f6c5a4daba050066872";
+WALK.sources = {"rd":{"path":"rust/sglang-server/src/api_server/http/request_decompression.rs","start":1,"end":311,"text":"//! Request-body decompression: the port of Python\n//! `http_request_decompression.py`. Gated on\n//! `SGLANG_ENABLE_REQUEST_DECOMPRESSION`; a request whose `x-body-compressed`\n//! header names the method (`x-body-compressed: zstd`) reaches every layer and\n//! handler inside it with the decompressed body.\n\nuse std::io::Read;\nuse std::sync::Arc;\n\nuse axum::Router;\nuse axum::body::Body;\nuse axum::extract::Request;\nuse axum::http::{HeaderValue, StatusCode, header};\nuse axum::middleware::Next;\nuse axum::response::Response;\nuse tokio::sync::Semaphore;\n\nuse crate::message::config::ServerArgs;\n\nconst COMPRESSION_HEADER: &str = \"x-body-compressed\";\n\n/// The most a zstd frame can expand: an RLE block, 4 bytes, decodes to at most\n/// 128 KiB.\nconst MAX_ZSTD_EXPANSION: u64 = 32 * 1024;\n\n/// Install the decompression middleware when `server_args` enables it;\n/// identity otherwise.\npub(super) fn apply(app: Router, server_args: &ServerArgs) -> Router {\n    if server_args.enable_request_decompression {\n        with_decompression(app, Arc::new(Semaphore::new(python_executor_workers())))\n    } else {\n        app\n    }\n}\n\n/// Python decompresses on asyncio's default executor, so at most\n/// `min(32, cpu_count + 4)` bodies at once; the rest wait for a thread.\nfn python_executor_workers() -> usize {\n    std::thread::available_parallelism()\n        .map_or(1, std::num::NonZero::get)\n        .saturating_add(4)\n        .min(32)\n}\n\nfn with_decompression(app: Router, decompressions: Arc<Semaphore>) -> Router {\n    app.layer(axum::middleware::from_fn(\n        move |request: Request, next: Next| {\n            decompress_request_body(decompressions.clone(), request, next)\n        },\n    ))\n}\n\n/// Like Python, only zstd is supported, the decompressed size is not capped\n/// (libzstd's default decoder refuses only frames whose window exceeds\n/// 128 MiB), an empty body stays empty, and the body is decompressed off the\n/// async workers. Python's rejections are 400s with a plain-text body and no\n/// content type.\nasync fn decompress_request_body(\n    decompressions: Arc<Semaphore>,\n    request: Request,\n    next: Next,\n) -> Response {\n    let Some(method) = request.headers().get(COMPRESSION_HEADER) else {\n        return next.run(request).await;\n    };\n    if method != \"zstd\" {\n        let method = String::from_utf8_lossy(method.as_bytes());\n        return bad_request(format!(\n            \"unsupported x-body-compressed '{method}'; supported: ['zstd']\"\n        ));\n    }\n\n    let (mut parts, body) = request.into_parts();\n    let body = match decompress_zstd(body, decompressions).await {\n        Ok(body) => body,\n        Err(error) => {\n            tracing::warn!(\"request body decompress failed: {error}\");\n            return bad_request(\"decompress failed\".to_owned());\n        }\n    };\n    parts.headers.remove(COMPRESSION_HEADER);\n    parts\n        .headers\n        .insert(header::CONTENT_LENGTH, HeaderValue::from(body.len()));\n    next.run(Request::from_parts(parts, Body::from(body))).await\n}\n\nasync fn decompress_zstd(body: Body, decompressions: Arc<Semaphore>) -> Result<Vec<u8>, String> {\n    let compressed = axum::body::to_bytes(body, usize::MAX)\n        .await\n        .map_err(|error| format!(\"reading the body: {error}\"))?;\n    if compressed.is_empty() {\n        return Ok(Vec::new());\n    }\n    let permit = decompressions\n        .acquire_owned()\n        .await\n        .map_err(|error| error.to_string())?;\n    tokio::task::spawn_blocking(move || {\n        let _permit = permit;\n        decode_zstd(&compressed)\n    })\n    .await\n    .map_err(|error| error.to_string())?\n    .map_err(|error| error.to_string())\n}\n\n/// Sized to the frame's declared content size, as far as the compressed bytes\n/// could expand, and trimmed after: the body holds no spare capacity.\n///\n/// Like Python's `stream_reader(...).read()`, a frame cut short yields what\n/// decoded before the cut: a frame missing only its checksum is the whole\n/// body, and a cut payload is left for the route to reject.\nfn decode_zstd(compressed: &[u8]) -> std::io::Result<Vec<u8>> {\n    let declared = zstd::zstd_safe::get_frame_content_size(compressed)\n        .ok()\n        .flatten()\n        .unwrap_or(0);\n    let bound = (compressed.len() as u64).saturating_mul(MAX_ZSTD_EXPANSION);\n    let mut body = Vec::with_capacity(usize::try_from(declared.min(bound)).unwrap_or(0));\n    // The decoder's only `UnexpectedEof` is the input ending mid-frame, and\n    // `read_to_end` keeps the bytes decoded before it.\n    if let Err(error) = zstd::stream::read::Decoder::with_buffer(compressed)?.read_to_end(&mut body)\n        && error.kind() != std::io::ErrorKind::UnexpectedEof\n    {\n        return Err(error);\n    }\n    body.shrink_to_fit();\n    Ok(body)\n}\n\nfn bad_request(message: String) -> Response {\n    let mut response = Response::new(Body::from(message));\n    *response.status_mut() = StatusCode::BAD_REQUEST;\n    response\n}\n\n#[cfg(test)]\nmod tests {\n    use std::time::Duration;\n\n    use axum::routing::post;\n    use tower::ServiceExt;\n\n    use super::*;\n\n    const GENERATE: &[u8] =\n        br#\"{\"input_ids\":[1,2,3],\"stream\":false,\"sampling_params\":{\"max_new_tokens\":8}}\"#;\n    /// Python `zstandard` 0.25: `ZstdCompressor(write_checksum=True).compress(GENERATE)`.\n    const GENERATE_WITH_CHECKSUM: &[u8] = b\"\\\n        \\x28\\xb5\\x2f\\xfd\\x24\\x4b\\x59\\x02\\x00\\x7b\\x22\\x69\\x6e\\x70\\x75\\x74\\x5f\\x69\\x64\\x73\\x22\\\n        \\x3a\\x5b\\x31\\x2c\\x32\\x2c\\x33\\x5d\\x2c\\x22\\x73\\x74\\x72\\x65\\x61\\x6d\\x22\\x3a\\x66\\x61\\x6c\\\n        \\x73\\x65\\x2c\\x22\\x73\\x61\\x6d\\x70\\x6c\\x69\\x6e\\x67\\x5f\\x70\\x61\\x72\\x61\\x6d\\x73\\x22\\x3a\\\n        \\x7b\\x22\\x6d\\x61\\x78\\x5f\\x6e\\x65\\x77\\x5f\\x74\\x6f\\x6b\\x65\\x6e\\x73\\x22\\x3a\\x38\\x7d\\x7d\\\n        \\xe2\\x70\\x1d\\xda\";\n    /// `ZstdCompressor(write_checksum=False).compress(GENERATE)`.\n    const GENERATE_WITHOUT_CHECKSUM: &[u8] = b\"\\\n        \\x28\\xb5\\x2f\\xfd\\x20\\x4b\\x59\\x02\\x00\\x7b\\x22\\x69\\x6e\\x70\\x75\\x74\\x5f\\x69\\x64\\x73\\x22\\\n        \\x3a\\x5b\\x31\\x2c\\x32\\x2c\\x33\\x5d\\x2c\\x22\\x73\\x74\\x72\\x65\\x61\\x6d\\x22\\x3a\\x66\\x61\\x6c\\\n        \\x73\\x65\\x2c\\x22\\x73\\x61\\x6d\\x70\\x6c\\x69\\x6e\\x67\\x5f\\x70\\x61\\x72\\x61\\x6d\\x73\\x22\\x3a\\\n        \\x7b\\x22\\x6d\\x61\\x78\\x5f\\x6e\\x65\\x77\\x5f\\x74\\x6f\\x6b\\x65\\x6e\\x73\\x22\\x3a\\x38\\x7d\\x7d\";\n    /// `ZstdCompressor(write_checksum=True).compress(b'{\"text\":\"' + b\"x\" * (3 << 17) + b'\"}')`:\n    /// three 128 KiB blocks, then the last block holding the 11 bytes left.\n    const THREE_BLOCKS_WITH_CHECKSUM: &[u8] = b\"\\\n        \\x28\\xb5\\x2f\\xfd\\xa4\\x0b\\x00\\x06\\x00\\x94\\x00\\x00\\x50\\x7b\\x22\\x74\\x65\\x78\\x74\\x22\\x3a\\\n        \\x22\\x78\\x01\\x00\\xf3\\xff\\x39\\x40\\x02\\x02\\x00\\x10\\x78\\x02\\x00\\x10\\x78\\x59\\x00\\x00\\x78\\\n        \\x78\\x78\\x78\\x78\\x78\\x78\\x78\\x78\\x22\\x7d\\x61\\x7d\\xfe\\x93\";\n\n    /// Each Python-produced frame decodes to what Python's middleware hands\n    /// the route (`stream_reader(...).read()` on the same bytes), or fails with\n    /// its `decompress failed` 400. A frame cut short keeps what decoded before\n    /// the cut: without its checksum it is the whole body, and a cut payload is\n    /// left for the route to reject as JSON.\n    #[tokio::test]\n    async fn cut_frames_decode_like_python() {\n        let cut = |frame: &[u8], bytes: usize| frame[..frame.len() - bytes].to_vec();\n        let three_blocks = [&br#\"{\"text\":\"\"#[..], &[b'x'; 3 << 17], br#\"\"}\"#].concat();\n        let corrupt_checksum = [\n            &GENERATE_WITH_CHECKSUM[..GENERATE_WITH_CHECKSUM.len() - 4],\n            &[0; 4],\n        ]\n        .concat();\n        // The frame, and the body Python's route sees (`None`: a 400).\n        type Case<'a> = (&'a str, Vec<u8>, Option<&'a [u8]>);\n        let cases: [Case; 14] = [\n            (\"checksum\", GENERATE_WITH_CHECKSUM.to_vec(), Some(GENERATE)),\n            (\n                \"no checksum\",\n                GENERATE_WITHOUT_CHECKSUM.to_vec(),\n                Some(GENERATE),\n            ),\n            (\n                \"checksum cut\",\n                cut(GENERATE_WITH_CHECKSUM, 4),\n                Some(GENERATE),\n            ),\n            (\n                \"half the checksum cut\",\n                cut(GENERATE_WITH_CHECKSUM, 2),\n                Some(GENERATE),\n            ),\n            (\n                \"content cut\",\n                GENERATE_WITH_CHECKSUM[..GENERATE_WITH_CHECKSUM.len() / 2].to_vec(),\n                Some(&GENERATE[..35]),\n            ),\n            (\n                \"header only\",\n                GENERATE_WITH_CHECKSUM[..6].to_vec(),\n                Some(b\"\"),\n            ),\n            (\n                \"second frame's checksum cut\",\n                [GENERATE_WITH_CHECKSUM, &cut(GENERATE_WITH_CHECKSUM, 4)].concat(),\n                Some(&[GENERATE, GENERATE].concat()),\n            ),\n            (\n                \"second frame's header cut\",\n                [GENERATE_WITH_CHECKSUM, &GENERATE_WITH_CHECKSUM[..4]].concat(),\n                Some(GENERATE),\n            ),\n            (\"corrupt checksum\", corrupt_checksum, None),\n            (\n                \"trailing junk\",\n                [GENERATE_WITH_CHECKSUM, b\"junk\"].concat(),\n                None,\n            ),\n            (\n                \"checksum cut, then junk\",\n                [&cut(GENERATE_WITH_CHECKSUM, 4), &b\"junk\"[..]].concat(),\n                None,\n            ),\n            (\n                \"three blocks, checksum cut\",\n                cut(THREE_BLOCKS_WITH_CHECKSUM, 4),\n                Some(&three_blocks),\n            ),\n            (\n                \"three blocks, last block cut\",\n                // The last block is stored raw: 5 of its 11 bytes arrive.\n                cut(THREE_BLOCKS_WITH_CHECKSUM, 10),\n                Some(&three_blocks[..(3 << 17) + 5]),\n            ),\n            (\n                \"three blocks, third block cut\",\n                cut(THREE_BLOCKS_WITH_CHECKSUM, 20),\n                Some(&three_blocks[..2 << 17]),\n            ),\n        ];\n        let app = with_decompression(\n            Router::new().route(\"/echo\", post(|body: bytes::Bytes| async move { body })),\n            Arc::new(Semaphore::new(1)),\n        );\n        for (case, frame, python) in cases {\n            let request = Request::post(\"/echo\")\n                .header(COMPRESSION_HEADER, \"zstd\")\n                .body(Body::from(frame))\n                .unwrap();\n            let response = app.clone().oneshot(request).await.unwrap();\n            let status = response.status();\n            let body = axum::body::to_bytes(response.into_body(), usize::MAX)\n                .await\n                .unwrap();\n            let (expected_status, expected_body) = match python {\n                Some(body) => (StatusCode::OK, body),\n                None => (StatusCode::BAD_REQUEST, &b\"decompress failed\"[..]),\n            };\n            assert_eq!(status, expected_status, \"{case}\");\n            assert!(body == expected_body, \"{case}: {} bytes\", body.len());\n        }\n    }\n\n    /// A decompression past the limit waits for a permit instead of failing,\n    /// and a body declaring its content size decodes without spare capacity.\n    #[tokio::test]\n    async fn decompressions_past_the_limit_wait() {\n        assert!((5..=32).contains(&python_executor_workers()));\n        let payload = br#\"{\"text\":\"hello\"}\"#;\n        let compressed = zstd::bulk::compress(payload, 3).unwrap();\n        let decoded = decode_zstd(&compressed).unwrap();\n        assert_eq!(\n            (decoded.as_slice(), decoded.capacity()),\n            (&payload[..], payload.len())\n        );\n\n        let decompressions = Arc::new(Semaphore::new(1));\n        let app = with_decompression(\n            Router::new().route(\"/echo\", post(|body: bytes::Bytes| async move { body })),\n            decompressions.clone(),\n        );\n        let held = decompressions.clone().acquire_owned().await.unwrap();\n        let request = Request::post(\"/echo\")\n            .header(COMPRESSION_HEADER, \"zstd\")\n            .body(Body::from(compressed))\n            .unwrap();\n        let mut response = tokio::spawn(app.oneshot(request));\n        assert!(\n            tokio::time::timeout(Duration::from_millis(200), &mut response)\n                .await\n                .is_err(),\n            \"decompressed without a permit\"\n        );\n        drop(held);\n        let response = response.await.unwrap().unwrap();\n        assert_eq!(response.status(), StatusCode::OK);\n        let body = axum::body::to_bytes(response.into_body(), usize::MAX)\n            .await\n            .unwrap();\n        assert_eq!(&body[..], payload);\n    }\n}","unpinned":false},"app":{"path":"rust/sglang-server/src/api_server/http/app.rs","start":176,"end":221,"text":"    // No body limit, matching the Python server.\n    let core = state.core.clone();\n    let mut app = router\n        .with_state(state)\n        .merge(hicache::routes(hicache_manager))\n        .layer(axum::extract::DefaultBodyLimit::disable());\n    if let Some(http_layer) = http_layer {\n        app = pre_generate::apply(app, &http_layer, core.clone());\n    }\n    // Outside the embedding package's layers, so a request naming another DP\n    // rank goes to that rank's listener before any of its work here.\n    app = match dp_relay::apply(\n        app,\n        &server_args.deployment_info,\n        server_args.enable_request_header_overrides,\n        core,\n    ) {\n        Ok(app) => app,\n        Err(error) => {\n            // Takes the server down, as a failed startup warmup does.\n            tracing::error!(\"{error}\");\n            let _ = relay_failure.try_send(error);\n            return;\n        }\n    };\n    // Outside the embedding package's layers, so they read decompressed bodies.\n    app = request_decompression::apply(app, &server_args);\n    // Outside the extension layer, so its routes are keyed too. The bootstrap\n    // registry below stays open, as Python serves it on its own server. Auth\n    // runs before decompression, so an unauthenticated body is never inflated.\n    app = auth::apply(app, &server_args.api_keys);\n\n    // Prefill-only KV bootstrap registry. Merged AFTER `with_state` — its\n    // router carries its own Arc<Registry> state, so it cannot merge into the\n    // Router<Arc<AppState>> above — and before `log::apply`, so bootstrap traffic\n    // shows in the access log.\n    if server_args.enable_pd_bootstrap() {\n        let (routes, sweeper) = pd_bootstrap::router_and_sweeper();\n        tokio::spawn(sweeper); // cancelled with the runtime on shutdown\n        app = app.merge(routes);\n        tracing::info!(\"PD KV bootstrap registry mounted on the api listener\");\n    }\n    app = auth::guard_fallback(app, &server_args.api_keys);\n\n    // Apply logging and access log middleware.\n    let app = log::apply(app, &server_args);","unpinned":false}};
+</script>
+<script>
+(function () {
+"use strict";
+const W = WALK;
+const UI_PRESETS = {
+  en: { prev: "← Back", next: "Next →", nextTrack: n => `Next: ${n} →`, replay: "Replay", keys: "Keys: ← →",
+        openAt: r => `Open on GitHub ${r}`, open: "Open on GitHub", watch: (t, s) => `Watch ${t}.${s}`, stepLabel: (n, t) => `Step ${n}: ${t}`,
+        concepts: "Concepts", roadmap: "Road to done", unpinned: "unpinned", sep: ": ",
+        status: { done: "Done", next: "Next", todo: "To do" },
+        tags: { fact: "Verified", infer: "Inference", measure: "To measure", draft: "Draft, not decided", schematic: "Schematic" } },
+  "zh-TW": { prev: "← 上一步", next: "下一步 →", nextTrack: n => `下一段：${n} →`, replay: "重播動畫", keys: "鍵盤：← →",
+        openAt: r => `在 GitHub 開啟 ${r}`, open: "在 GitHub 開啟", watch: (t, s) => `看動畫 ${t}.${s}`, stepLabel: (n, t) => `第 ${n} 步：${t}`,
+        concepts: "觀念速查", roadmap: "完成這項工作的路線", unpinned: "未釘選版本", sep: "：",
+        status: { done: "完成", next: "下一步", todo: "待做" },
+        tags: { fact: "已查證", infer: "推論", measure: "待量測", draft: "設計草稿，尚未決定", schematic: "示意圖" } },
+};
+const UI = Object.assign({}, UI_PRESETS[W.ui] || UI_PRESETS.en, W.uiOverrides || {});
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function fail(msg) { const f = $("fail"); f.hidden = false; f.textContent += msg + "\n"; }
+
+// ---------- syntax highlight (lightweight, line-based) ----------
+const KW = {
+  rust: "fn let mut move async await pub use mod const struct enum trait impl match if else return for in as type Some None Ok Err true false self Self super crate where dyn ref loop while break continue unsafe static",
+  python: "def class return if elif else for while in not and or is None True False import from as with try except finally raise yield lambda async await pass break continue global nonlocal assert del self",
+  js: "function const let var return if else for while in of new class extends import from export default async await try catch finally throw typeof instanceof null undefined true false this switch case break continue yield interface type enum implements",
+  go: "func var const type struct interface map chan go defer return if else for range switch case default break continue package import nil true false select fallthrough",
+  c: "int char float double void long short unsigned signed const static struct union enum typedef return if else for while do switch case default break continue sizeof auto template typename class public private protected namespace using new delete virtual override nullptr true false constexpr inline __global__ __device__ __host__ __shared__ extern volatile",
+  java: "class interface enum extends implements public private protected static final void return if else for while do switch case default break continue new try catch finally throw throws import package null true false this super",
+};
+KW.ts = KW.js; KW.cpp = KW.c; KW.cuda = KW.c; KW.kotlin = KW.java;
+const LANG_EXT = { rs: "rust", py: "python", js: "js", mjs: "js", ts: "ts", tsx: "ts", jsx: "js", go: "go", c: "c", h: "c", cc: "cpp", cpp: "cpp", hpp: "cpp", cu: "cuda", cuh: "cuda", java: "java", kt: "kotlin" };
+const KWSET = {}; for (const k in KW) KWSET[k] = new Set(KW[k].split(" "));
+function hl(line, lang) {
+  const hash = lang === "python";
+  const re = hash
+    ? /(#.*$)|([rbfu]{0,2}"(?:\\.|[^"\\])*"|[rbfu]{0,2}'(?:\\.|[^'\\])*')|(@[A-Za-z_][\w.]*)|(\b\d[\d_.]*\b)|(\b[A-Za-z_]\w*\b)/g
+    : lang === "rust"
+    ? /(\/\/.*$)|(b?r#".*?"#|b?"(?:\\.|[^"\\])*")|('(?:\\.|[^'\\])'|'[a-z_]\w*)|(\b\d[\d_.xXa-fA-F]*\b)|(\b[a-z_]\w*!)|(\b[A-Za-z_]\w*\b)/g
+    : /(\/\/.*$)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(\0)|(\b\d[\d_.xXa-fA-F]*\b)|(\0)|(\b[A-Za-z_]\w*\b)/g;
+  const kws = KWSET[lang] || new Set();
+  let out = "", last = 0, m;
+  while ((m = re.exec(line))) {
+    out += esc(line.slice(last, m.index));
+    const t = m[0]; let cls = null;
+    if (hash) {
+      if (m[1]) cls = "c"; else if (m[2]) cls = "s"; else if (m[3]) cls = "m"; else if (m[4]) cls = "n";
+      else if (m[5]) { if (kws.has(t)) cls = "k"; else if (/^[A-Z]/.test(t)) cls = "t"; }
+    } else {
+      if (m[1]) cls = "c"; else if (m[2]) cls = "s"; else if (m[3]) cls = t.length > 3 && !t.endsWith("'") ? "lt" : "s";
+      else if (m[4]) cls = "n"; else if (m[5]) cls = "m";
+      else if (m[6]) { if (kws.has(t)) cls = "k"; else if (/^[A-Z]/.test(t)) cls = "t"; }
+    }
+    out += cls ? `<span class="${cls}">${esc(t)}</span>` : esc(t);
+    last = re.lastIndex;
+  }
+  return out + esc(line.slice(last));
+}
+
+// ---------- code panel ----------
+const SRC = W.sources;
+function blobUrl(key, a, b) {
+  const src = SRC[key];
+  if (W.blobUrl) return W.blobUrl(src.path, a, b);
+  if (!W.repoUrl || src.unpinned) return null;
+  return `${W.repoUrl}/blob/${W.sha}/${src.path}#L${a}` + (b && b !== a ? `-L${b}` : "");
+}
+let currentFile = null;
+function renderCode(key) {
+  if (currentFile === key) return;
+  currentFile = key;
+  const src = SRC[key];
+  const lang = src.lang || LANG_EXT[(src.path.split(".").pop() || "").toLowerCase()] || "";
+  $("code-body").innerHTML = src.text.split("\n").map((ln, i) =>
+    `<div class="ln" data-n="${src.start + i}"><span class="no">${src.start + i}</span><span class="tx">${hl(ln, lang) || " "}</span></div>`).join("");
+  $("code-file").innerHTML = esc(src.path).replace(/([^/]+)$/, "<b>$1</b>") + (src.unpinned ? ` · ${UI.unpinned}` : "");
+}
+function showCode(code) {
+  const body = $("code-body");
+  renderCode(code.f);
+  let first = null;
+  body.querySelectorAll(".ln").forEach(el => {
+    const n = +el.dataset.n;
+    const on = code.r.some(([a, b]) => n >= a && n <= b);
+    el.classList.toggle("on", on);
+    if (on && !first) first = el;
+  });
+  body.classList.toggle("has-on", !!first);
+  if (first) body.scrollTo({ top: Math.max(0, first.offsetTop - body.clientHeight * 0.22), behavior: "smooth" });
+  const a = code.r[0][0], b = code.r[code.r.length - 1][1];
+  const gh = $("code-gh"), url = blobUrl(code.f, a, b);
+  gh.hidden = !url;
+  if (url) { gh.href = url; gh.textContent = UI.openAt(a === b ? `L${a}` : `L${a}-${b}`); }
+}
+
+// ---------- map ----------
+const NS = "http://www.w3.org/2000/svg";
+const svg = $("stage").querySelector("svg");
+const MAP = W.map || {};
+const ZONES = MAP.zones || {};
+const ACTORS = MAP.actors || [];
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+const dyn = el("g", { id: "dyn" }, svg);
+const noteEl = MAP.note ? el("text", { class: "note", x: MAP.note[0], y: MAP.note[1] }, svg) : null;
+const actorEls = {};
+ACTORS.forEach(a => {
+  const tone = "tone-" + (a.tone || "ink");
+  const n = a.count || 1;
+  const g = el("g", { class: "actor " + (a.kind || "token") }, dyn);
+  for (let j = 0; j < n; j++) {
+    if ((a.kind || "token") === "token") el("circle", { cx: j * 26, cy: 0, r: 12, class: tone }, g);
+    else if (a.kind === "diamond") el("path", { d: `M${j * 20},-8 l8,8 l-8,8 l-8,-8Z`, class: tone }, g);
+    else el("rect", { x: j * 20 - 8, y: -8, width: 16, height: 16, rx: 2, class: tone }, g);
+  }
+  if (a.label) el("text", { x: 0, y: 0 }, g).textContent = a.label;
+  g.style.opacity = 0;
+  actorEls[a.id] = g;
+});
+function blank() { const at = {}; ACTORS.forEach(a => at[a.id] = "hidden"); return { at, focus: [], warn: [], glow: [], note: "", meters: [], custom: {} }; }
+function merge(s, p) {
+  const o = { at: Object.assign({}, s.at), focus: s.focus, warn: s.warn, glow: s.glow, note: s.note, meters: s.meters, custom: Object.assign({}, s.custom) };
+  for (const k in p) {
+    if (k === "at" || k === "custom") Object.assign(o[k], p[k]);
+    else o[k] = p[k];
+  }
+  return o;
+}
+function resolve(st) {
+  // zone name, [x, y], "@actor" (ride along with another actor) or "hidden"
+  const pos = {}, groups = {};
+  ACTORS.forEach(a => {
+    const z = st.at[a.id];
+    if (Array.isArray(z)) pos[a.id] = z.slice();
+    else if (z && ZONES[z]) { (groups[z] = groups[z] || []).push(a.id); }
+  });
+  for (const z in groups) {
+    const ids = groups[z], [x, y] = ZONES[z];
+    const tokens = ids.filter(id => (ACTORS.find(a => a.id === id).kind || "token") === "token");
+    ids.forEach(id => { pos[id] = [x, y]; });
+    tokens.forEach((id, i) => { pos[id] = [x + (i - (tokens.length - 1) / 2) * 26, y]; });
+  }
+  ACTORS.forEach(a => {
+    const z = st.at[a.id];
+    if (typeof z === "string" && z[0] === "@" && pos[z.slice(1)]) { const [x, y] = pos[z.slice(1)]; pos[a.id] = [x + 14, y - 14]; }
+  });
+  return pos;
+}
+const lastPos = {};
+function renderMap(st) {
+  const pos = resolve(st);
+  ACTORS.forEach(a => {
+    const g = actorEls[a.id], xy = pos[a.id];
+    if (xy) { lastPos[a.id] = xy; g.style.transform = `translate(${xy[0]}px, ${xy[1]}px)`; }
+    else if (lastPos[a.id]) g.style.transform = `translate(${lastPos[a.id][0]}px, ${lastPos[a.id][1]}px)`;
+    g.style.opacity = xy ? 1 : 0;
+    g.classList.toggle("glow", st.glow.includes(a.id));
+  });
+  svg.querySelectorAll(".focus, .warn").forEach(e => e.classList.remove("focus", "warn"));
+  st.focus.forEach(id => { const e = svg.querySelector("#" + CSS.escape(id)); if (e) e.classList.add("focus"); });
+  st.warn.forEach(id => { const e = svg.querySelector("#" + CSS.escape(id)); if (e) e.classList.add("warn"); });
+  if (noteEl) noteEl.textContent = st.note || "";
+  $("meters").innerHTML = (st.meters || []).map(m => `<div class="meter ${m.tone || ""}"><span class="mk">${esc(m.k)}</span><span class="mv">${esc(m.v)}</span></div>`).join("");
+  if (MAP.onFrame) MAP.onFrame(st, svg, { el, NS });
+}
+(function legend() {
+  const L = $("legend");
+  (MAP.legend || []).forEach(item => {
+    const s = document.createElement("span");
+    const tone = "tone-" + (item.tone || "ink");
+    let mark;
+    switch (item.mark) {
+      case "chip": mark = `<rect x="2" y="2" width="12" height="12" rx="2" class="${tone}"/>`; break;
+      case "diamond": mark = `<path d="M8,1 L15,8 L8,15 L1,8Z" class="${tone}"/>`; break;
+      case "outline": mark = `<rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="var(--${item.tone || "bad"})" stroke-width="2"/>`; break;
+      case "dash": mark = `<rect x="2" y="2" width="12" height="12" rx="2" fill="none" stroke="var(--${item.tone || "cool"})" stroke-width="1.5" stroke-dasharray="3 2"/>`; break;
+      case "line": mark = `<path d="M1 8 H15" stroke="var(--${item.tone || "muted"})" stroke-width="1.5" stroke-dasharray="3 3"/>`; break;
+      default: mark = `<circle cx="8" cy="8" r="7" class="${tone}"/>`;
+    }
+    s.innerHTML = `<svg width="16" height="16" aria-hidden="true">${mark}</svg>${item.text}`;
+    L.appendChild(s);
+  });
+})();
+
+// ---------- player ----------
+const TRACKS = W.tracks;
+let ti = 0, si = 0, timers = [];
+const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const finals = new Map();
+function sceneStates(t, s) {
+  const sc = TRACKS[t].scenes[s];
+  let st = blank();
+  if (sc.carry) { const prev = s > 0 ? [t, s - 1] : t > 0 ? [t - 1, TRACKS[t - 1].scenes.length - 1] : null; if (prev) { const ps = sceneStates(prev[0], prev[1]); st = ps[ps.length - 1]; } }
+  const states = [];
+  (sc.frames && sc.frames.length ? sc.frames : [{}]).forEach(f => { st = merge(st, f); states.push(st); });
+  return states;
+}
+function play() {
+  timers.forEach(clearTimeout); timers = [];
+  const states = sceneStates(ti, si);
+  if (reduce) { renderMap(states[states.length - 1]); return; }
+  states.forEach((s, k) => timers.push(setTimeout(() => renderMap(s), k * (MAP.frameMs || 850))));
+}
+function go(t, s) {
+  ti = t; si = s;
+  const tr = TRACKS[t], sc = tr.scenes[s];
+  [...$("tracks").children].forEach((b, i) => b.setAttribute("aria-selected", i === t ? "true" : "false"));
+  $("stepno").textContent = `${t + 1}.${s + 1}`;
+  $("ntitle").textContent = sc.t;
+  $("ntags").innerHTML = (sc.tags || []).map(k => `<span class="tag ${k}">${UI.tags[k] || k}</span>`).join("");
+  $("nbody").innerHTML = sc.body || "";
+  const c = $("nconcept"); c.innerHTML = sc.concept || ""; c.hidden = !sc.concept;
+  const dots = $("dots"); dots.innerHTML = "";
+  tr.scenes.forEach((x, i) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = i + 1; b.title = x.t;
+    b.setAttribute("aria-label", UI.stepLabel(`${t + 1}.${i + 1}`, x.t));
+    if (i === s) b.setAttribute("aria-current", "true");
+    b.addEventListener("click", () => go(t, i)); dots.appendChild(b);
+  });
+  $("prev").disabled = t === 0 && s === 0;
+  const last = t === TRACKS.length - 1 && s === tr.scenes.length - 1;
+  $("next").disabled = last;
+  $("next").textContent = s === tr.scenes.length - 1 && !last ? UI.nextTrack(TRACKS[t + 1].name) : UI.next;
+  if (sc.code) showCode(sc.code);
+  play();
+  if (sc.wire) { try { sc.wire($("nbody")); } catch (e) { fail("scene " + (t + 1) + "." + (s + 1) + " wire(): " + e.message); } }
+  try { localStorage.setItem(storeKey, JSON.stringify([t, s])); } catch (e) {}
+}
+function step(d) {
+  let t = ti, s = si + d;
+  if (s >= TRACKS[t].scenes.length) { if (t + 1 >= TRACKS.length) return; t++; s = 0; }
+  if (s < 0) { if (t === 0) return; t--; s = TRACKS[t].scenes.length - 1; }
+  go(t, s);
+}
+const storeKey = "walk-pos:" + (W.id || W.title);
+
+// ---------- header ----------
+$("eyebrow").textContent = W.eyebrow || "";
+$("h1").textContent = W.title;
+$("thesis").innerHTML = W.thesis || "";
+$("links").innerHTML = (W.links || []).map(l => `<a href="${esc(l.href)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join("");
+$("prev").textContent = UI.prev; $("replay").textContent = UI.replay; $("keyhint").textContent = UI.keys;
+TRACKS.forEach((tr, i) => {
+  const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "tab");
+  b.textContent = `${i + 1}. ${tr.name}`; b.addEventListener("click", () => go(i, 0)); $("tracks").appendChild(b);
+});
+$("prev").addEventListener("click", () => step(-1));
+$("next").addEventListener("click", () => step(1));
+$("replay").addEventListener("click", play);
+document.addEventListener("keydown", e => {
+  if (e.target.closest && e.target.closest("input, textarea, select")) return;
+  if (e.key === "ArrowRight") step(1); else if (e.key === "ArrowLeft") step(-1);
+});
+
+// ---------- back matter ----------
+const after = $("after");
+function section(title, intro) {
+  const s = document.createElement("section"); s.className = "ref";
+  s.innerHTML = `<h2>${title}</h2>` + (intro ? `<p>${intro}</p>` : "");
+  after.appendChild(s); return s;
+}
+if (W.concepts && W.concepts.length) {
+  const s = section(W.conceptsTitle || UI.concepts);
+  const cards = document.createElement("div"); cards.className = "cards"; s.appendChild(cards);
+  W.concepts.forEach(cd => {
+    const d = document.createElement("div"); d.className = "panel card mono";
+    d.innerHTML = `<h3>${esc(cd.h)}</h3><p>${cd.p}</p>`;
+    if (cd.goto) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "goto";
+      b.textContent = UI.watch(cd.goto[0] + 1, cd.goto[1] + 1);
+      b.addEventListener("click", () => { go(cd.goto[0], cd.goto[1]); document.querySelector(".player").scrollIntoView({ behavior: "smooth", block: "start" }); });
+      d.appendChild(b);
+    }
+    cards.appendChild(d);
+  });
+}
+(W.sections || []).forEach(sec => {
+  const s = section(sec.title, sec.intro);
+  const box = document.createElement("div"); box.innerHTML = sec.html || ""; s.appendChild(box);
+});
+if (W.roadmap && W.roadmap.length) {
+  const s = section(W.roadmapTitle || UI.roadmap);
+  const ol = document.createElement("ol"); ol.className = "road"; s.appendChild(ol);
+  W.roadmap.forEach(r => {
+    const li = document.createElement("li"); li.className = "panel " + (r.status || "todo");
+    li.innerHTML = `<span><b>${r.title}</b>${r.text ? UI.sep + r.text : ""}</span><span class="st">${UI.status[r.status || "todo"]}</span>`;
+    ol.appendChild(li);
+  });
+}
+if (W.footnote) { const p = document.createElement("p"); p.className = "foot"; p.innerHTML = W.footnote; after.appendChild(p); }
+document.querySelectorAll(".goto[data-go]").forEach(b => b.addEventListener("click", () => {
+  const [t, s] = b.dataset.go.split(",").map(Number); go(t, s); document.querySelector(".player").scrollIntoView({ behavior: "smooth", block: "start" });
+}));
+
+// Start at #T.S when the link names a scene (e.g. page.html#2.3), else where this reader left off.
+let start = [0, 0];
+const hm = /^#(\d+)\.(\d+)$/.exec(location.hash);
+const valid = v => Array.isArray(v) && TRACKS[v[0]] && TRACKS[v[0]].scenes[v[1]];
+if (hm && valid([hm[1] - 1, hm[2] - 1])) start = [hm[1] - 1, hm[2] - 1];
+else { try { const v = JSON.parse(localStorage.getItem(storeKey) || "null"); if (valid(v)) start = v; } catch (e) {} }
+go(start[0], start[1]);
+})();
+</script>
+</body>
+</html>

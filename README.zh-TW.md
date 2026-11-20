@@ -4,6 +4,8 @@
 
 這是一個 agent skill，在你動手改 code 之前，先產生一份互動式的程式碼導覽頁。給它一個 GitHub issue（PR、bug 回報或單純的問題也行），它會挑一個具體的東西，例如一個請求、一個 token 或一個 batch，沿著釘在某個 commit 的真實程式碼走一遍，讓你看清楚這項工作為什麼存在、改動會落在哪裡。
 
+**[線上試用範例](https://liyangtseng.github.io/code-walkthrough/examples/sglang-decompression-queue.html)**：用 ← → 逐步瀏覽。
+
 ![導覽頁：左邊是釘選版本的原始碼並高亮正在講的行，右邊是動畫示意圖和逐步說明](docs/screenshot.png)
 
 每一頁都有：
@@ -47,11 +49,13 @@ Agent 會讀 issue 和底下的討論、寫出 thesis、在釘選的 commit 上 
 
 ## 範例
 
-[`examples/sglang-decompression-queue`](examples/sglang-decompression-queue) 導覽一個 [sglang](https://github.com/sgl-project/sglang) 的 issue：為什麼排隊等解壓的請求，已經把整個 body 讀進記憶體。在 sglang 的 checkout 上建置：
+[`examples/sglang-decompression-queue`](examples/sglang-decompression-queue) 導覽一個 [sglang](https://github.com/sgl-project/sglang) 的 issue：為什麼排隊等解壓的請求，已經把整個 body 讀進記憶體。可以[直接線上看](https://liyangtseng.github.io/code-walkthrough/examples/sglang-decompression-queue.html)，或在 sglang 的 checkout 上重新建置：
 
 ```bash
-node skills/code-walkthrough/scripts/build.mjs examples/sglang-decompression-queue/walk.js --repo ~/path/to/sglang
+node skills/code-walkthrough/scripts/build.mjs examples/sglang-decompression-queue/walk.js --repo ~/path/to/sglang --out docs/examples/sglang-decompression-queue.html
 ```
+
+GitHub Pages 會發布 `docs/` 目錄，所以重建後的頁面 push 上去就會更新。
 
 ## 授權
 
